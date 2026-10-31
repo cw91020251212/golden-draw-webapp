@@ -6,8 +6,9 @@
 - 新增頁首「分享」按鈕：優先使用裝置原生 Web Share API；不支援時複製目前頁面網址，遇到分享取消不顯示錯誤。
 - 加入自訂「金球時光」圖示，輸出 192×192、512×512、180×180 Apple Touch 及 maskable 512×512 尺寸；保留生成原圖作為 `app-icon-source.png`。
 - 保留原有 Web App manifest（standalone 顯示模式），README 說明本機預覽、HTTPS 部署、分享和安裝方式；目前未加入離線快取。
-- 建立並推送公開 GitHub 儲存庫：`https://github.com/cw91020251212/golden-draw-webapp`。Pages 尚未建立；嘗試 GitHub Pages API 時收到 403 `Resource not accessible by integration`，目前連線缺少 Pages 寫入權限。
-- 停止臨時預覽伺服器；此專案目前沒有正式公開網站網址。
+- 建立並推送公開 GitHub 儲存庫：`https://github.com/cw91020251212/golden-draw-webapp`。已透過 GitHub Device flow 授權並啟用 Pages，來源為 `main` 分支根目錄 `/`。
+- GitHub Pages 首次建置已成功（API build status `built`）；正式網站：`https://cw91020251212.github.io/golden-draw-webapp/`。首頁及 `app.js`、manifest、主要圖示均可從 Pages 讀取。
+- 停止臨時預覽伺服器；正式網站由使用者自己的 GitHub Pages 提供，沒有使用 Manus 臨時託管。
 
 ## 檢查紀錄
 
