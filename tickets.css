@@ -1,0 +1,52 @@
+.ticket-card,
+.ticket-card * { box-sizing: border-box; }
+.ticket-card {
+  position: relative;
+  width: 100%; min-width: 0; padding: 16px;
+  border: 2px solid #c8a84f; border-radius: 14px;
+  background: #fffdf5; color: #244c37;
+  box-shadow: 0 3px 10px rgba(63, 73, 43, .12);
+}
+.ticket-heading { margin: 0 0 12px; color: #315c3f; font-size: 20px; line-height: 1.35; }
+.ticket-result { display: grid; gap: 13px; min-width: 0; }
+.ticket-number-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ticket-ball-wrap { display: inline-block; position: relative; flex: 0 0 auto; width: clamp(38px, 12vw, 48px); height: clamp(38px, 12vw, 48px); border-radius: 50%; }
+.ticket-ball {
+  display: inline-flex; width: 100%; height: 100%; align-items: center; justify-content: center;
+  border: 2px solid #b99b48; border-radius: 50%; background: #f6edcf; color: #234a34;
+  font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.ticket-extra-line { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 10px; border-top: 1px solid #e5d8ad; }
+.ticket-extra-label { min-width: 0; color: #3f563f; font-size: 18px; line-height: 1.5; }
+.ticket-ball-extra { border-color: #b48b2c; background: #f4e1a3; color: #583d0c; }
+.ticket-reveal-note { margin: 8px 0; color: #43574a; font-size: 18px; line-height: 1.5; }
+.ticket-reveal-button {
+  display: block; width: 100%; min-height: 48px; padding: 10px 14px; border: 2px solid #315c3f;
+  border-radius: 9px; background: #315c3f; color: #fffdf5; font: inherit; font-size: 18px;
+  font-weight: 700; line-height: 1.35; cursor: pointer;
+}
+.ticket-reveal-button:hover:not(:disabled) { background: #244a34; }
+.ticket-reveal-button:focus-visible { outline: 3px solid #d1ad4c; outline-offset: 3px; }
+.ticket-reveal-button:disabled { opacity: .8; cursor: default; }
+@media (max-width: 360px) { .ticket-card { padding: 12px; } .ticket-number-line { gap: 6px; } .ticket-ball-wrap { width: 38px; height: 38px; } }
+@media (prefers-reduced-motion: reduce) {
+  .ticket-card, .ticket-card *, .ticket-card *::before, .ticket-card *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+.ticket-section{padding:28px 0 12px;border-bottom:1px solid #deded2}
+.ticket-section > .ticket-heading{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}
+#ticket-title{font-family:Georgia,'Songti TC',serif;font-size:27px;font-weight:500;margin:0;line-height:1.4}
+#batch-progress{font-size:17px;color:#526154;margin:0}
+.ticket-intro,.ticket-source{font-size:16px;line-height:1.7;color:#526154}
+.ticket-source a{color:#695122;text-underline-offset:3px}
+#tickets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:20px 0}
+.ticket-result[hidden]{display:none!important}
+@media(max-width:760px){#tickets{grid-template-columns:1fr}#ticket-title{font-size:25px}.ticket-source{font-size:14px}}
+
+
+/* Matching tactile, non-gradient ticket actions for the isolated camera candidate. */
+.ticket-reveal-button{border-radius:14px!important;background:#f1f1e8!important;border:1px solid #b8c2b4!important;color:#30483a!important;box-shadow:0 3px 0 #9eab9e,0 5px 10px #1d33251c,inset 0 1px 0 #fff!important;transition:transform .14s ease,box-shadow .14s ease,background-color .14s ease}
+.ticket-reveal-button:hover:not(:disabled){background:#e8eee4!important;transform:translateY(-1px);box-shadow:0 4px 0 #91a092,0 7px 12px #1d332522,inset 0 1px 0 #fff!important}
+.ticket-reveal-button:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 #849282,0 2px 4px #1d33251c!important}
+.ticket-reveal-button:focus-visible{outline:3px solid #d4a342;outline-offset:3px}
+.ticket-reveal-button:disabled{filter:saturate(.55);box-shadow:0 2px 0 #a8afa4!important}
+@media(prefers-reduced-motion:reduce){.ticket-reveal-button{transition:none}}
