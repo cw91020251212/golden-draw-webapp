@@ -1,5 +1,6 @@
 import * as THREE from './three.module.js';
-import {CompatibleRenderer} from './compat.js?v=immediate7';
+import { buildMachine } from './machine-model.js?v=shared-entry-final-1';
+import {CompatibleRenderer} from './compat.js?v=shared-entry-final-1';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
 const $=id=>document.getElementById(id);
 const reds=new Set([1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46]);
@@ -19,66 +20,94 @@ const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 const RESULT_SHOT_DWELL_MS=3200;
 let resultShot=null,resultShotStable=false,resultShotStableAt=0,pendingStableFrame=null,resultReturnView='auto';
 let batchTotal=4,batchIndex=0,batchResults=[],batchActive=false,roundOrders=[],timelineAt=Date.now();
-function selectView(mode){view=mode;const shown=view==='auto'&&phase==='running'?'close':view;document.querySelectorAll('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===shown);b.setAttribute('aria-pressed',String(b.dataset.view===shown));});const names={auto:'自動運鏡',wide:'全景',close:'近鏡',orbit:'環繞',results:'收珠特寫'};const label=$('camera-summary');if(label)label.textContent=`鏡頭：${names[shown]||names[view]}`;$('result-focus').hidden=true;$('studio').classList.toggle('result-shot',view==='results');}
+function selectView(mode){view=mode;const shown=view;document.querySelectorAll('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===shown);b.setAttribute('aria-pressed',String(b.dataset.view===shown));});const names={auto:'自動運鏡',wide:'全景',close:'近鏡',orbit:'環繞',results:'收珠特寫'};const label=$('camera-summary');if(label)label.textContent=`鏡頭：${names[shown]||names[view]}`;$('result-focus').hidden=true;$('studio').classList.toggle('result-shot',view==='results');}
 function leaveResults(){resultShot=null;resultShotStable=false;resultShotStableAt=0;pendingStableFrame=null;$('result-focus').hidden=true;$('studio').classList.remove('result-shot');document.querySelector('[data-view="results"]').disabled=true;if(view==='results')selectView(resultReturnView);}
 function fillResultFocus(){const fill=(el,n)=>{el.textContent=String(n).padStart(2,'0');el.className='number '+colorOf(n);el.setAttribute('aria-label','號碼 '+n);};$('focus-numbers').innerHTML=revealed.slice(0,6).map(n=>`<div class="number ${colorOf(n)}" aria-label="正選號碼 ${n}">${String(n).padStart(2,'0')}</div>`).join('');fill($('focus-extra'),revealed[6]);$('focus-order').textContent='依出珠次序 · 即將排序';}
-function startResultShot(){qaEvent('result-shot-start',{round:batchIndex+1,drawCount:revealed.length});resultReturnView=view==='results'?resultReturnView:view;resultShotStable=false;resultShotStableAt=0;resultShot={from:camera.position.clone(),target:cameraTarget.clone(),time:0};$('result-focus').hidden=true;document.querySelector('[data-view="results"]').disabled=false;document.querySelectorAll('[data-view]:not([data-view="results"])').forEach(b=>b.disabled=true);selectView('results');setStageStatus('前六球按出珠順序入左槽 · 活門開啟後特別號才入右槽');}
+function startResultShot(){qaEvent('result-shot-start',{round:batchIndex+1,drawCount:revealed.length});resultReturnView=view==='results'?resultReturnView:view;resultShotStable=false;resultShotStableAt=0;resultShot={from:camera.position.clone(),target:cameraTarget.clone(),time:0};$('result-focus').hidden=true;document.querySelector('[data-view="results"]').disabled=false;document.querySelectorAll('[data-view]:not([data-view="results"])').forEach(b=>b.disabled=true);selectView('results');setStageStatus('後方共用入口到交會點 · 六球左槽／特別號開閘右轉');}
 
 function clearNumbers(){resetSort();numbers.innerHTML=Array.from({length:6},(_,i)=>`<div data-slot="${i}" class="number empty" aria-label="第 ${i+1} 個號碼尚未抽出">—</div>`).join('');$('extra').className='number empty';$('extra').textContent='＋';$('extra').setAttribute('aria-label','特別號碼尚未抽出');}
 clearNumbers();
-let renderer,scene,camera,root,rotor,balls=[],cupGroup,cupBallLayer,cupBallRecords=[],clock=new THREE.Clock(),cameraTarget=new THREE.Vector3(0,1.1,0),mouseX=0,machineBounds=null,fitProbeCamera=null,machineFitVertices=null,fitCameraCache=new Map();
-const sphereGeo=new THREE.SphereGeometry(.123,22,16),plainBallMaterial=new THREE.MeshStandardMaterial({color:0xf4eddb,roughness:.24,metalness:.04}),temp=new THREE.Vector3();
-let innerPickupCurve=null,railCurve=null,mainResultSlot=null,specialResultSlot=null,diverterGatePivot=null,diverterGateAngle=0,diverterGateTarget=0,diverterGateState='closed',diverterGateTransition=null;
-// Observational entertainment timing, not a verified mechanical turn count.
-const pickupStart=i=>quickActive?0:8+i*19;
-const DRAW_END=8+6*19+2.6;
+let renderer,scene,camera,root,rotor,balls=[],cupGroup,cupBallLayer,cupBallRecords=[],machineModel=null,clock=new THREE.Clock(),cameraTarget=new THREE.Vector3(0,1.1,0),mouseX=0,machineBounds=null,fitProbeCamera=null,machineFitVertices=null,fitCameraCache=new Map();
+const sphereGeo=new THREE.SphereGeometry(.095,22,16),plainBallMaterial=new THREE.MeshStandardMaterial({color:0xf4eddb,roughness:.24,metalness:.04}),temp=new THREE.Vector3();
+let selectorMouth=null,selectorOcclusion=null,receiverEntryStart=null,receiverJunction=null,receiverEntryLane=null;
+let mainResultSlot=null,specialResultSlot=null,diverterGatePivot=null;
+let diverterGateAngle=0,diverterGateTarget=0,diverterGateState='closed',diverterGateTransition=null;
+let trayShotUntil=0;
+const NORMAL_PICKUP_DURATION=3.6;
+const SPECIAL_PICKUP_DURATION=12;
+const pickupStart=i=>quickActive?0.9+i*1.45:8+i*19;
+const DRAW_END=8+6*19+SPECIAL_PICKUP_DURATION;
 const timelineRate=()=>quickActive?1:rate;
-function spinDirection(t){if(quickActive)return -1;for(let i=0;i<7;i++){const local=t-pickupStart(i);if(local>=0&&local<2.6)return -1;}return 1;}
-function motorSpeed(t){return spinDirection(t)<0?-2.42:4.4;}
+// The supplied video shows clockwise mixing and no clear reversal; ease the speed only slightly at selection.
+const spinDirection=()=>-1;
+function motorSpeed(){return -3.45;}
 
 function envTexture(){const c=document.createElement('canvas');c.width=1024;c.height=512;const g=c.getContext('2d');g.fillStyle='#6f8290';g.fillRect(0,0,1024,512);const grad=g.createLinearGradient(0,0,0,512);grad.addColorStop(0,'#ffffff');grad.addColorStop(.35,'#b6c4c8');grad.addColorStop(.55,'#2e4757');grad.addColorStop(1,'#a6a398');g.fillStyle=grad;g.fillRect(0,0,1024,512);g.fillStyle='#ffeed1';g.fillRect(90,30,140,220);g.fillStyle='#ffffff';g.fillRect(590,70,70,290);g.fillStyle='#e5edec';g.fillRect(830,90,130,120);const t=new THREE.CanvasTexture(c);t.mapping=THREE.EquirectangularReflectionMapping;t.colorSpace=THREE.SRGBColorSpace;return t;}
 function ballTexture(n){const c=document.createElement('canvas');c.width=256;c.height=128;const g=c.getContext('2d');g.fillStyle=({red:'#cf292f',blue:'#226596',green:'#23834e'})[colorOf(n)];g.fillRect(0,0,256,128);for(let row=0;row<2;row++)for(let col=0;col<4;col++){const x=32+col*64,y=32+row*64;g.fillStyle='#fff4d1';g.beginPath();g.ellipse(x,y,23,21,0,0,Math.PI*2);g.fill();g.fillStyle='#3b3021';g.font='bold 24px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText(n,x,y+1);}const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;t.userData={number:n,color:colorOf(n)};return t;}
-function init(){scene=new THREE.Scene();scene.environment=envTexture();camera=new THREE.PerspectiveCamera(37,1,.1,70);camera.position.set(3,2.5,11.6);try{renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'high-performance'});}catch{renderer=new CompatibleRenderer(()=>({balls,rotor,cupBallRecords}));$('scene').dataset.renderer='compatible';}renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setClearColor(0x000000,0);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;$('scene').appendChild(renderer.domElement);$('loading').remove();
+function init(){scene=new THREE.Scene();scene.environment=envTexture();camera=new THREE.PerspectiveCamera(37,1,.1,70);camera.position.set(3,2.5,11.6);try{renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'high-performance'});}catch{renderer=new CompatibleRenderer(()=>({balls,rotor,cupBallRecords,machineModel,receiverEntryLane,mainResultSlot,specialResultSlot,diverterGatePivot}));$('scene').dataset.renderer='compatible';}renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setClearColor(0x000000,0);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;$('scene').appendChild(renderer.domElement);$('loading').remove();
 scene.add(new THREE.HemisphereLight(0xdcecf5,0x72664c,2.3));const key=new THREE.DirectionalLight(0xffe6b7,4.3);key.position.set(-4,7,5);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-5;key.shadow.camera.right=5;key.shadow.camera.top=7;key.shadow.camera.bottom=-4;key.shadow.bias=-.001;scene.add(key);const rim=new THREE.DirectionalLight(0xcceeff,3);rim.position.set(3,3,-4);scene.add(rim);const front=new THREE.PointLight(0xffd08a,16,12);front.position.set(2,2,4);scene.add(front);
 root=new THREE.Group();scene.add(root);
-const gold=new THREE.MeshStandardMaterial({color:0xc79a45,metalness:.88,roughness:.23});const darkGold=new THREE.MeshStandardMaterial({color:0x8e692d,metalness:.8,roughness:.3});const brightGold=new THREE.MeshStandardMaterial({color:0xe6bb67,metalness:.8,roughness:.2});const glass=new THREE.MeshPhysicalMaterial({color:0xd6eeec,metalness:0,roughness:.1,transparent:true,opacity:.095,side:THREE.DoubleSide,depthWrite:false});const edgeGlass=new THREE.MeshPhysicalMaterial({color:0xd7f4f4,roughness:.1,metalness:.2,transparent:true,opacity:.18,depthWrite:false});
-const box=(w,h,d,mat,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;root.add(m);return m;};
-const makeResultSlot=(name,cx,cy,length,slope)=>{const g=new THREE.Group();g.name=name;g.position.set(cx,cy,1.02);g.rotation.z=slope;g.userData={slotLength:length,slope};root.add(g);const part=(w,h,d,mat,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;g.add(m);return m;};part(length+.08,.10,.46,darkGold,0,-.12,0);part(length,.045,.40,gold,0,-.05,0);for(const z of [-.205,.205])part(length,.10,.04,brightGold,0,.015,z);for(const x of [-length/2,length/2])part(.04,.10,.45,gold,x,.015,0);return g;};
-const cyl=(r,h,mat,x,y,z)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,32),mat);m.position.set(x,y,z);m.castShadow=true;root.add(m);return m;};
-const torus=(r,t,mat,z,y=.05)=>{const m=new THREE.Mesh(new THREE.TorusGeometry(r,t,12,96),mat);m.position.set(0,y,z);m.castShadow=true;root.add(m);return m;};
-box(2.55,.37,1.7,darkGold,0,-2.15,0);box(2.66,.07,1.8,gold,0,-1.93,0);box(2.6,.07,1.75,brightGold,0,-2.36,0);box(.22,.73,.32,gold,-.94,-1.53,-.15);box(.22,.73,.32,gold,.94,-1.53,-.15);box(.72,.58,.5,darkGold,0,-1.7,-.35);
-// Main transparent horizontal drum, bounded by two unmistakable gold rims.
-torus(1.53,.065,gold,.43);torus(1.53,.055,darkGold,-.43);torus(1.44,.018,brightGold,.45);torus(1.44,.018,brightGold,-.43);
-const shell=new THREE.Mesh(new THREE.CylinderGeometry(1.51,1.51,.84,96,1,true),glass);shell.rotation.x=Math.PI/2;shell.position.y=.05;root.add(shell);
-for(const z of [-.435,.435]){const face=new THREE.Mesh(new THREE.CircleGeometry(1.46,96),glass);face.position.set(0,.05,z);root.add(face);}
-for(let i=0;i<10;i++){const a=i*Math.PI/5;const x=Math.cos(a)*1.53,y=Math.sin(a)*1.53+.05;const pin=new THREE.Mesh(new THREE.CylinderGeometry(.033,.033,.91,10),i%2?darkGold:gold);pin.rotation.x=Math.PI/2;pin.position.set(x,y,0);root.add(pin);const bolt=new THREE.Mesh(new THREE.SphereGeometry(.048,12,8),darkGold);bolt.position.set(x,y,.487);root.add(bolt);}
-rotor=new THREE.Group();rotor.position.y=.05;root.add(rotor);const hub=new THREE.Mesh(new THREE.CylinderGeometry(.30,.30,.24,48),gold);hub.rotation.x=Math.PI/2;hub.position.z=-.15;rotor.add(hub);const boss=new THREE.Mesh(new THREE.SphereGeometry(.105,24,16),brightGold);boss.position.z=.035;rotor.add(boss);
-for(let i=0;i<6;i++){const a=i*Math.PI/3;const spoke=new THREE.Mesh(new THREE.CylinderGeometry(.018,.018,1.36,8),darkGold);spoke.rotation.z=a-Math.PI/2;spoke.position.set(Math.cos(a)*.75,Math.sin(a)*.75,-.08);rotor.add(spoke);const paddle=new THREE.Mesh(new THREE.BoxGeometry(.34,.52,.5),edgeGlass);paddle.position.set(Math.cos(a)*1.2,Math.sin(a)*1.2,0);paddle.rotation.z=a;rotor.add(paddle);const paddleEdge=new THREE.Mesh(new THREE.BoxGeometry(.025,.52,.5),gold);paddleEdge.position.copy(paddle.position);paddleEdge.rotation.z=a;rotor.add(paddleEdge);}
-// Tall seven-column loading magazine from the supplied historic photo.
-box(1.98,.14,.60,gold,0,1.72,0);box(1.95,.07,.58,brightGold,0,4.24,0);box(.07,2.5,.55,gold,-.95,2.98,0);box(.07,2.5,.55,gold,.95,2.98,0);
-for(let col=0;col<7;col++){const x=(col-3)*.265;cyl(.139,2.46,glass,x,2.99,0);for(const z of [-.16,.16]){const rail=cyl(.012,2.46,brightGold,x-.136,2.99,z);}
-const cap=new THREE.Mesh(new THREE.TorusGeometry(.138,.012,8,24),gold);cap.rotation.x=Math.PI/2;cap.position.set(x,4.25,0);root.add(cap);}
-// Lower release mechanism and the inclined front collection tray.
-box(.5,.34,.55,gold,0,-1.55,.22);const funnel=new THREE.Mesh(new THREE.CylinderGeometry(.24,.12,.35,24,1,true),gold);funnel.position.set(0,-1.52,.55);root.add(funnel);mainResultSlot=makeResultSlot('six-main-number-slot',-.04,-1.65,1.72,.18);specialResultSlot=makeResultSlot('special-number-slot',1.003,-1.532,.40,-.18);diverterGatePivot=new THREE.Group();diverterGatePivot.name='central-diverter-gate';diverterGatePivot.position.set(.82,-1.595,1.02);root.add(diverterGatePivot);const gateHinge=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,.22,24),darkGold);gateHinge.castShadow=true;diverterGatePivot.add(gateHinge);const gateLeaf=new THREE.Mesh(new THREE.BoxGeometry(.045,.24,.44),gold);gateLeaf.position.set(0,.12,0);gateLeaf.castShadow=true;gateLeaf.receiveShadow=true;diverterGatePivot.add(gateLeaf);const gateFace=new THREE.Mesh(new THREE.BoxGeometry(.012,.17,.32),brightGold);gateFace.position.set(.03,.12,0);diverterGatePivot.add(gateFace);
-// Fixed, visible half-circle path from the drum's right-side outlet to the collection slot.
-innerPickupCurve=new THREE.CatmullRomCurve3([new THREE.Vector3(0,-1.17,.46),new THREE.Vector3(.63,-1.02,.50),new THREE.Vector3(1.05,-.63,.57),new THREE.Vector3(1.23,-.16,.66),new THREE.Vector3(1.045,.19,.70)]);
-railCurve=new THREE.CatmullRomCurve3([new THREE.Vector3(1.045,.19,.70),new THREE.Vector3(1.19,-.12,.75),new THREE.Vector3(1.19,-.38,.80),new THREE.Vector3(.842,-1.222,.87),new THREE.Vector3(0,-1.57,.95)]);
-const railPoints=railCurve.getPoints(48);for(const side of [-1,1]){const offset=railPoints.map(p=>p.clone().add(new THREE.Vector3(side*.065,0,0)));const railPath=new THREE.CatmullRomCurve3(offset);const track=new THREE.Mesh(new THREE.TubeGeometry(railPath,64,.018,8,false),side<0?brightGold:gold);track.material=track.material.clone();track.material.transparent=true;track.material.opacity=.86;root.add(track);}
-// A discreet plaque, original branding rather than an official logo.
-const plaque=document.createElement('canvas');plaque.width=512;plaque.height=128;const pg=plaque.getContext('2d');pg.fillStyle='#c19548';pg.fillRect(0,0,512,128);pg.fillStyle='#4d3d21';pg.textAlign='center';pg.font='22px Georgia';pg.fillText('T H E   G O L D E N   D R A W',256,56);pg.font='15px Arial';pg.fillText('RETRO SERIES  /  49 BALLS',256,89);const pt=new THREE.CanvasTexture(plaque);pt.colorSpace=THREE.SRGBColorSpace;const pm=new THREE.Mesh(new THREE.PlaneGeometry(1.08,.27),new THREE.MeshStandardMaterial({map:pt,metalness:.5,roughness:.4}));pm.position.set(0,-2.15,.857);root.add(pm);
-const floorMat=new THREE.MeshStandardMaterial({color:0x254755,roughness:.55,metalness:.2});const floor=new THREE.Mesh(new THREE.CylinderGeometry(2.7,2.95,.20,96),floorMat);floor.position.y=-2.52;floor.receiveShadow=true;scene.add(floor);const stageRing=new THREE.Mesh(new THREE.TorusGeometry(2.71,.012,8,120),gold);stageRing.rotation.x=Math.PI/2;stageRing.position.y=-2.42;scene.add(stageRing);
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.ShadowMaterial({opacity:.22}));ground.rotation.x=-Math.PI/2;ground.position.y=-2.63;ground.receiveShadow=true;scene.add(ground);
-for(let i=0;i<49;i++){const n=i+1,m=new THREE.Mesh(sphereGeo,new THREE.MeshStandardMaterial({map:ballTexture(n),roughness:.28,metalness:.08}));m.castShadow=true;root.add(m);balls.push({n,mesh:m,plainMaterial:m.material,vel:new THREE.Vector3(),state:'rack',rack:new THREE.Vector3(((i%7)-3)*.265,1.98+Math.floor(i/7)*.315,0)});}
+const gold=new THREE.MeshStandardMaterial({color:0xc79a45,metalness:.88,roughness:.23});
+const darkGold=new THREE.MeshStandardMaterial({color:0x8e692d,metalness:.8,roughness:.3});
+const brightGold=new THREE.MeshStandardMaterial({color:0xe6bb67,metalness:.8,roughness:.2});
+const glass=new THREE.MeshPhysicalMaterial({color:0xd6eeec,metalness:0,roughness:.1,transparent:true,opacity:.07,side:THREE.DoubleSide,depthWrite:false});
+const edgeGlass=new THREE.MeshPhysicalMaterial({color:0xd7f4f4,roughness:.1,metalness:.2,transparent:true,opacity:.16,depthWrite:false});
+machineModel=buildMachine(THREE,root,{gold,darkGold,brightGold,glass,edgeGlass});
+rotor=machineModel.rotor;
+selectorMouth=machineModel.selectorMouth;
+selectorOcclusion=machineModel.selectorOcclusion;
+receiverEntryStart=machineModel.receiverEntryStart;
+receiverJunction=machineModel.receiverJunction;
+receiverEntryLane=machineModel.receiverEntryLane;
+mainResultSlot=machineModel.mainResultSlot;
+specialResultSlot=machineModel.specialResultSlot;
+diverterGatePivot=machineModel.diverterGatePivot;
+const floorMat=new THREE.MeshStandardMaterial({color:0x254755,roughness:.55,metalness:.2});
+const floor=new THREE.Mesh(new THREE.CylinderGeometry(2.7,2.95,.20,96),floorMat);
+floor.position.y=-2.74;floor.receiveShadow=true;scene.add(floor);
+const stageRing=new THREE.Mesh(new THREE.TorusGeometry(2.71,.012,8,120),gold);
+stageRing.rotation.x=Math.PI/2;stageRing.position.y=-2.64;scene.add(stageRing);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.ShadowMaterial({opacity:.22}));
+ground.rotation.x=-Math.PI/2;ground.position.y=-2.84;ground.receiveShadow=true;scene.add(ground);
+for(let i=0;i<49;i++){const n=i+1,m=new THREE.Mesh(sphereGeo,new THREE.MeshStandardMaterial({map:ballTexture(n),roughness:.28,metalness:.08}));m.castShadow=true;root.add(m);balls.push({n,mesh:m,plainMaterial:m.material,vel:new THREE.Vector3(),state:'rack',rack:new THREE.Vector3(((i%7)-3)*.20,1.98+Math.floor(i/7)*.315,0)});}
 cupGroup=new THREE.Group();cupGroup.name='machine-result-slots';root.add(cupGroup);cupBallLayer=new THREE.Group();cupBallLayer.name='cleared-result-balls';cupGroup.add(cupBallLayer);
 resetMachine();root.updateMatrixWorld(true);captureMachineBounds();fitProbeCamera=new THREE.PerspectiveCamera(camera.fov,camera.aspect,camera.near,camera.far);new ResizeObserver(resize).observe($('scene'));resize();animate();}
 function resize(){const w=$('scene').clientWidth,h=$('scene').clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
-function resetMachine(){balls.forEach(b=>{b.mesh.material=b.plainMaterial;b.mesh.position.copy(b.rack);b.mesh.rotation.set(0,.4,0);b.mesh.visible=true;b.state='rack';b.nextKick=0;b.vel.set(0,0,0);});rotor.rotation.z=0;resetDiverterGate();}
+function resetMachine(){
+ balls.forEach(b=>{b.mesh.material=b.plainMaterial;b.mesh.position.copy(b.rack);b.mesh.rotation.set(0,.4,0);b.mesh.visible=true;b.state='rack';b.nextKick=0;b.vel.set(0,0,0);});
+ rotor.rotation.set(0,0,0);trayShotUntil=0;resetDiverterGate();
+}
 function clearCupBalls(){cupBallRecords=[];if(!cupBallLayer)return;while(cupBallLayer.children.length){const m=cupBallLayer.children[cupBallLayer.children.length-1];if(m.material&&m.material!==plainBallMaterial)m.material.dispose();cupBallLayer.remove(m);}}
-function cupSlot(drawIndex){if(drawIndex===6)return new THREE.Vector3(1.003,-1.439,1.02);const x=[-.75,-.49,-.23,.03,.29,.55][drawIndex];return new THREE.Vector3(x,-1.5565+(x+.04)*Math.tan(.18),1.02);}
+function cupSlot(drawIndex){
+ if(drawIndex===6)return specialResultSlot.localToWorld(new THREE.Vector3(.22,.145,0));
+ // Video order reads left-to-right in the long main lane; later arrivals stop to the right.
+ const localX=-.75+drawIndex*.27;
+ return mainResultSlot.localToWorld(new THREE.Vector3(localX,.145,0));
+}
 function showCupBall(b){if(!b.numberedMaterial)b.numberedMaterial=new THREE.MeshStandardMaterial({map:ballTexture(b.n),roughness:.28,metalness:.08});b.mesh.material=b.numberedMaterial;}
-function setDiverterGate(open,round=batchIndex+1){const target=open?Math.PI/2:0;if(!diverterGatePivot||(diverterGateTarget===target&&diverterGateTransition===null))return;diverterGateTarget=target;diverterGateState=open?'opening':'closing';diverterGateTransition={from:diverterGateAngle,to:target,started:realTime*1000,duration:450};qaEvent(open?'diverter-gate-opening':'diverter-gate-closing',{round,angle:diverterGateAngle,target});setStageStatus(open?'中央活門開啟中 · 特別號候位':'特別號已入右槽 · 中央活門關閉中');}
-function updateDiverterGate(){if(!diverterGatePivot||!diverterGateTransition)return;const tr=diverterGateTransition,t=Math.min(1,(realTime*1000-tr.started)/tr.duration),e=t*t*(3-2*t);diverterGateAngle=tr.from+(tr.to-tr.from)*e;diverterGatePivot.rotation.y=diverterGateAngle;if(t>=1){diverterGateAngle=tr.to;diverterGatePivot.rotation.y=diverterGateAngle;diverterGateTransition=null;diverterGateState=diverterGateAngle===0?'closed':'open';qaEvent(diverterGateState==='open'?'diverter-gate-open':'diverter-gate-closed',{round:batchIndex+1,angle:diverterGateAngle});setStageStatus(diverterGateState==='open'?'中央活門已開 · 特別號通過中':'六加一結果已入槽 · 活門已關');}}
-function resetDiverterGate(){diverterGateAngle=0;diverterGateTarget=0;diverterGateState='closed';diverterGateTransition=null;if(diverterGatePivot)diverterGatePivot.rotation.y=0;}
+function setDiverterGate(open,round=batchIndex+1){
+ const target=open?Math.PI/2:0;
+ if(!diverterGatePivot||(diverterGateTarget===target&&diverterGateTransition===null))return;
+ diverterGateTarget=target;diverterGateState=open?'opening':'closing';
+ diverterGateTransition={from:diverterGateAngle,to:target,started:realTime*1000,duration:Math.max(60,450/Math.max(1,rate))};
+ qaEvent(open?'diverter-gate-opening':'diverter-gate-closing',{round,angle:diverterGateAngle,target});
+ setStageStatus(open?'右側特別號分流片開啟中':'特別號已通過分流點 · 分流片關閉中');
+}
+function updateDiverterGate(){
+ if(!diverterGatePivot||!diverterGateTransition)return;
+ const tr=diverterGateTransition,t=Math.min(1,(realTime*1000-tr.started)/tr.duration),e=t*t*(3-2*t);
+ diverterGateAngle=tr.from+(tr.to-tr.from)*e;diverterGatePivot.rotation.y=diverterGateAngle;
+ if(t>=1){
+  diverterGateAngle=tr.to;diverterGatePivot.rotation.y=diverterGateAngle;diverterGateTransition=null;
+  diverterGateState=diverterGateAngle===0?'closed':'open';
+  qaEvent(diverterGateState==='open'?'diverter-gate-open':'diverter-gate-closed',{round:batchIndex+1,angle:diverterGateAngle});
+  setStageStatus(diverterGateState==='open'?'右側特別號分流片已開啟':'六加一結果已入承接台 · 分流片已關');
+ }
+}
+function resetDiverterGate(){
+ diverterGateAngle=0;diverterGateTarget=0;diverterGateState='closed';diverterGateTransition=null;
+ if(diverterGatePivot)diverterGatePivot.rotation.y=0;
+}
 function revealCupTicket(event){const {index,main,extra,order=[]}=event.detail||{};qaEvent('ticket-revealed',{ticket:index});const sorted=[...main].sort((a,b)=>a-b);Array.from(numbers.children).forEach((el,i)=>{const n=sorted[i];el.textContent=String(n).padStart(2,'0');el.className='number '+colorOf(n)+' reveal';el.setAttribute('aria-label',`由小至大第 ${i+1} 個正選號碼：${n}`);});$('extra').textContent=String(extra).padStart(2,'0');$('extra').className='number '+colorOf(extra)+' reveal';$('extra').setAttribute('aria-label',`特別號碼 ${extra}`);$('orderlabel').textContent='由小至大排列';$('draworder').hidden=false;$('draworder').textContent='原出珠次序：'+order.map(n=>String(n).padStart(2,'0')).join(' → ');$('instruction').textContent=`第 ${index} 注票券已揭曉並整理號碼；攪珠機已在每注完成後復位到完整 49 球池。`;setStageStatus(`第 ${index} 注票券已揭曉 · 49 球池已復位`);}
 function syncDrum(){const enabled=!quickActive&&!extracting&&phase!=='sorting'&&(!quickSession||nextIndex<order.length);$('scene').setAttribute('aria-disabled',String(!enabled));}
 function updateTiming(){const seconds=Math.round(DRAW_END/rate+2.4);const durationText=rate===1?'每注約 2 分鐘':`每注約 ${seconds} 秒`;document.querySelector('.timing').textContent=`${rate===1?'正常節奏':$('speed').selectedOptions[0].textContent.split(' · ')[0]} · ${durationText}`;updateSettingsSummary();}
@@ -91,10 +120,10 @@ function begin(){
  batchActive=true;$('summary').classList.remove('copy-error');resetTickets(batchTotal);$('entry-count').disabled=true;$('copy').disabled=true;timelineAt=Date.now();beginRound(true);
 }
 function beginRound(scroll=false){qaEvent('round-start',{round:batchIndex+1});
- leaveResults();clearCupBalls();resetMachine();qaEvent('diverter-gate-reset',{round:batchIndex+1,state:diverterGateState,angle:diverterGateAngle});phase='running';selectView('auto');setLiveDrawDisplay(true);paused=false;elapsed=0;order=randomDraw();roundOrders[batchIndex]=order.slice();revealed=[];extracting=null;qaEvent('round-reset-state',{round:batchIndex+1,rackCount:balls.filter(b=>b.state==='rack').length,cupRecordCount:cupBallRecords.length,activeDrawnCount:balls.filter(b=>b.state==='drawn'||b.state==='extract').length,drawOrderLength:order.length,gateState:diverterGateState,gateAngle:diverterGateAngle});nextIndex=0;clearNumbers();ensureEffects();
+ leaveResults();clearCupBalls();resetMachine();qaEvent('diverter-gate-reset',{round:batchIndex+1,state:diverterGateState,angle:diverterGateAngle});phase='running';selectView('auto');trayShotUntil=0;setLiveDrawDisplay(true);paused=false;elapsed=0;order=randomDraw();roundOrders[batchIndex]=order.slice();revealed=[];extracting=null;qaEvent('round-reset-state',{round:batchIndex+1,rackCount:balls.filter(b=>b.state==='rack').length,cupRecordCount:cupBallRecords.length,activeDrawnCount:balls.filter(b=>b.state==='drawn'||b.state==='extract').length,drawOrderLength:order.length,gateState:diverterGateState,gateAngle:diverterGateAngle});nextIndex=0;clearNumbers();ensureEffects();
  $('start').disabled=true;$('start').textContent=`正在攪第 ${batchIndex+1} / ${batchTotal} 注…`;$('pause').disabled=false;$('pause').textContent='暫停';
- $('status').textContent=`第 ${batchIndex+1} / ${batchTotal} 注 · 彩球入鼓`;$('instruction').textContent='彩球逐顆移到機台前方結果槽並顯示號碼與顏色；完成後可揭曉各注票券。';
- $('summary').textContent=`已完成 ${batchIndex} / ${batchTotal} 注，完成的卡片已放在下方。`;$('progressfill').style.width='0%';setStageStatus(`第 ${batchIndex+1} 注抽球中 · close 近鏡`);syncDrum();
+ $('status').textContent=`第 ${batchIndex+1} / ${batchTotal} 注 · 彩球入圓鼓`;$('instruction').textContent='透明圓鼓內持續順時針攪珠；選中球進入鼓底中央直管後被機身遮擋，切到承接台才在後方共用入口現身，再滾向交會點分流。';
+ $('summary').textContent=`已完成 ${batchIndex} / ${batchTotal} 注，完成的卡片已放在下方。`;$('progressfill').style.width='0%';setStageStatus(`第 ${batchIndex+1} 注抽球中 · 電視鏡頭自動切換`);syncDrum();
  if(soundOn)startAudio();if(scroll){$('studio').focus({preventScroll:true});$('studio').scrollIntoView({behavior:reducedMotion()?'auto':'smooth',block:'start'});}
 }
 function reset(){
@@ -105,7 +134,7 @@ function finishRound(){
  if(!batchActive||phase!=='sorting'||!resultShotStable||!resultShotStableAt||performance.now()-resultShotStableAt<RESULT_SHOT_DWELL_MS)return;
  qaEvent('result-shot-dwell-complete',{round:batchIndex+1,elapsed:performance.now()-resultShotStableAt});qaEvent('round-end',{round:batchIndex+1});const result={main:sortedMain(),extra:revealed[6],index:batchIndex+1};batchResults.push(result);addTicket({...result,order:revealed.slice()});clearCupBalls();resetMachine();batchIndex++;
  if(batchIndex<batchTotal){beginRound();return;}
- phase='done';batchActive=false;finishTickets();setStageStatus('本批已完成 · 球池已復位 · 各注結果保留在票券');setLiveDrawDisplay(false);selectView('auto');$('entry-count').disabled=false;$('status').textContent=`${batchTotal} 注全部完成`;$('step').textContent='到下方按「揭曉」查看號碼';$('instruction').textContent='全部攪好！機台已復位到完整 49 球池；按下方「揭曉」查看各注獨立票券。';$('start').disabled=false;setStartLabel();$('copy').disabled=false;$('summary').textContent=`已完成 ${batchTotal} 注，向下按鈕揭曉或一次複製全部；單式填寫只用每注六個正選。`;setMotor(0);setRolling(false);setEffectsActive(false);syncDrum();
+ phase='done';batchActive=false;finishTickets();setStageStatus('本批已完成 · 球池已復位 · 各注結果保留在票券');setLiveDrawDisplay(false);selectView('auto');$('entry-count').disabled=false;$('status').textContent=`${batchTotal} 注全部完成`;$('step').textContent='到下方按「揭曉」查看號碼';$('instruction').textContent='攪珠完成！機台已復位到完整 49 球池；按下方「揭曉」查看各注獨立票券。';$('start').disabled=false;setStartLabel();$('copy').disabled=false;$('summary').textContent=`已完成 ${batchTotal} 注，向下按鈕揭曉或一次複製全部；單式填寫只用每注六個正選。`;setMotor(0);setRolling(false);setEffectsActive(false);syncDrum();
 }
 // Unadvertised one-ball interaction, independent of the selected ticket batch.
 	function startFromDrum(){
@@ -125,44 +154,186 @@ function finishRound(){
  balls.forEach(b=>{if(b.state==='rack'||b.state==='fall'){const i=b.n-1;b.mesh.position.set((i%7-3)*.255,-.85+Math.floor(i/7)*.25,((i%3)-1)*.16);b.state='drum';b.vel.set(0,0,0);}});
  quickActive=true;leaveResults();phase='running';paused=false;elapsed=0;extracting=null;timelineAt=Date.now();balls.forEach(b=>{b.nextKick=0;});
  $('start').disabled=true;$('pause').disabled=false;$('pause').textContent='暫停';$('entry-count').disabled=true;
- $('status').textContent='反轉拾珠 · 取出一顆';$('step').textContent=`已揭曉 ${revealed.length} / ${order.length} 顆`;$('instruction').textContent='正在攪珠…';$('progressfill').style.width='0%';syncDrum();
+ $('status').textContent='圓鼓持續順時針攪珠 · 等待選球';$('step').textContent=`已揭曉 ${revealed.length} / ${order.length} 顆`;$('instruction').textContent='正在攪珠…';$('progressfill').style.width='0%';syncDrum();
  // Commit visible motion in this input event, without waiting for release or a timer.
  const firstFrame=1/60;advanceTimeline(firstFrame);simulate(firstFrame);rotor.rotation.z-=.18;updateCamera(firstFrame);renderer.render(scene,camera,true);
- ensureEffects();setMotor(.028);if(soundOn)startAudio();setStageStatus('單顆抽珠中 · 機台自動放大');
+ ensureEffects();setMotor(.028);if(soundOn)startAudio();setStageStatus('單顆抽珠中 · 電視式自動運鏡');
 }
 function finishQuickDraw(sorted=false){
  if(phase==='sorting'&&!sorted)return;
  quickActive=false;phase='done';paused=false;$('start').disabled=false;setStartLabel();$('pause').disabled=true;$('pause').textContent='暫停';$('entry-count').disabled=false;
  $('status').textContent=revealed.length===7?'出珠完畢':'出珠完成';$('step').textContent=`已抽出 ${revealed.length} / ${order.length} 顆`;$('instruction').textContent=revealed.length===7?'七顆號碼已全部抽出。':`本次號碼：${String(revealed[revealed.length-1]).padStart(2,'0')}`;$('progressfill').style.width='100%';setMotor(0);setRolling(false);setEffectsActive(false);syncDrum();
 }
-function reveal(n,i){revealed.push(n);$('instruction').textContent=`第 ${i+1} 顆已到前方結果槽：${String(n).padStart(2,'0')}；號碼與顏色即時顯示。`;if(i===6){phase='sorting';syncDrum();startResultShot();$('status').textContent='七球已落入前方六加一槽 · 等待特寫穩定';$('step').textContent=`第 ${batchIndex+1} / ${batchTotal} 注 · 六正選＋一特別號已入槽`;$('instruction').textContent='六顆正選按出珠次序進入左長槽；中央活門開啟後，第七顆特別號才進入右短槽。票券可在下方手動揭曉。';$('pause').disabled=true;$('start').textContent='結果特寫中…';$('progressfill').style.width='100%';setMotor(0);}}
+function reveal(n,i){
+ revealed.push(n);trayShotUntil=elapsed+2.4;
+ $('instruction').textContent=`第 ${i+1} 顆已在前方承接台停定：${String(n).padStart(2,'0')}。`;
+ if(i===6){
+  phase='sorting';syncDrum();startResultShot();
+  $('status').textContent='六顆正選在左長槽 · 特別號在右短格';
+  $('step').textContent=`第 ${batchIndex+1} / ${batchTotal} 注 · 六正選＋一特別號已入承接台`;
+  $('instruction').textContent='球由後方共用入口滾到交會點；前六顆沿共面斜槽進入左側長槽，第七顆到達交會點後活門打開，再轉入右側短格。票券可在下方手動揭曉。';
+  $('pause').disabled=true;$('start').textContent='結果特寫中…';$('progressfill').style.width='100%';setMotor(0);
+ }
+}
 function updateSorting(){if(batchActive&&phase==='sorting')finishRound();}
 
-function simulate(dt){const radius=1.34,spin=spinDirection(elapsed);for(const b of balls){if(b.state==='rack'&&elapsed>(b.n-1)*.032){b.state='fall';b.vel.set(Math.sin(b.n*12.71)*.22,-.1,Math.cos(b.n*8.17)*.12);}if(b.state!=='fall'&&b.state!=='drum')continue;const p=b.mesh.position;b.vel.y-=9.8*dt;if(b.state==='drum'){b.vel.x+=(spin*3.2+Math.sin(elapsed*4.1+b.n*2.37)*2.1)*dt;b.vel.z+=Math.sin(elapsed*3+b.n*1.73)*.8*dt;const blade=Math.cos((Math.atan2(p.y-.05,p.x)-rotor.rotation.z)*6);if(p.y<-.52&&elapsed>(b.nextKick||0)&&blade>-.15){b.vel.y=Math.max(b.vel.y,2.65+.55*(.5+.5*Math.sin(b.n*2.71+elapsed*5)));b.vel.x+=Math.sin(b.n+elapsed*3)*.35;b.nextKick=elapsed+.48+(b.n%5)*.065;}}b.vel.y=Math.min(3.3,b.vel.y);const speed=b.vel.length();if(speed>4.6)b.vel.multiplyScalar(4.6/speed);p.addScaledVector(b.vel,dt);if(b.state==='fall'&&p.y<1.30){b.state='drum';playImpact(.19,.72);}if(b.state==='drum'){const y=p.y-.05,d=Math.hypot(p.x,y);if(d>radius){const nx=p.x/d,ny=y/d;p.x=nx*radius;p.y=.05+ny*radius;const v=b.vel.x*nx+b.vel.y*ny;if(v>0){b.vel.x-=1.53*v*nx;b.vel.y-=1.53*v*ny;collisionSound(v,.68);}}}if(Math.abs(p.z)>.24){p.z=Math.sign(p.z)*.24;collisionSound(Math.abs(b.vel.z),.8);b.vel.z*=-.65;}b.vel.multiplyScalar(Math.pow(.994,dt*60));b.mesh.rotation.x+=b.vel.y*dt*2;b.mesh.rotation.z-=b.vel.x*dt*2;}
-for(let i=0;i<balls.length;i++){const a=balls[i];if(a.state!=='drum')continue;for(let j=i+1;j<balls.length;j++){const b=balls[j];if(b.state!=='drum')continue;temp.subVectors(a.mesh.position,b.mesh.position);const d=temp.length();if(d<.245&&d>.00001){temp.multiplyScalar(1/d);const overlap=(.245-d)*.5;a.mesh.position.addScaledVector(temp,overlap);b.mesh.position.addScaledVector(temp,-overlap);const rel=a.vel.clone().sub(b.vel).dot(temp);if(rel<0){a.vel.addScaledVector(temp,-rel*.66);b.vel.addScaledVector(temp,rel*.66);collisionSound(-rel,.55);}}}}}
-
-function extraction(){
- if(!extracting&&nextIndex<order.length&&elapsed>=pickupStart(nextIndex)){const b=balls.find(b=>b.n===order[nextIndex]);b.state='extract';extracting={b,index:nextIndex,start:pickupStart(nextIndex),from:b.mesh.position.clone(),sfx:{drop:false,slot:false},gateRequested:false,gatePassStart:null,gatePassFrom:null,gateCrossed:false,gatePassed:false};$('status').textContent=nextIndex===6?'反轉拾珠 · 特別號碼':'反轉拾珠 · 取出一顆';$('step').textContent=`第 ${nextIndex+1} / ${order.length} 顆`;nextIndex++;}
- if(!extracting)return;
- const e=extracting,t=Math.min(1,(elapsed-e.start)/2.6),p=e.b.mesh.position,pickup=new THREE.Vector3(0,-1.17,.46),tray=railCurve.getPoint(1),slot=cupSlot(e.index);
- if(e.index===6&&t>=.72&&!e.gateRequested){e.gateRequested=true;setDiverterGate(true,batchIndex+1);qaEvent('special-ball-waiting-for-gate',{round:batchIndex+1,index:7,n:e.b.n,gateState:diverterGateState});}
- const gateReady=e.index!==6||(t>=.90&&diverterGateState==='open');
- if(t>=.90&&gateReady&&!e.sfx.drop){e.sfx.drop=true;showCupBall(e.b);qaEvent('cup-ball-visible',{round:batchIndex+1,index:e.index+1,n:e.b.n,color:colorOf(e.b.n),slot:e.index===6?'special':'main'});playImpact(.2,.68);}
- if(e.index!==6&&t>=.97&&!e.sfx.slot){e.sfx.slot=true;playImpact(.15,.54);}
- if(t<.12)p.lerpVectors(e.from,pickup,smooth(t/.12));
- else if(t<.42)p.copy(innerPickupCurve.getPoint(smooth((t-.12)/.30)));
- else if(t<.90)p.copy(railCurve.getPoint(smooth((t-.42)/.48)));
- else if(e.index===6){
-  if(diverterGateState!=='open'){e.gatePassFrom=new THREE.Vector3(.65,-1.463,1.02);p.lerpVectors(tray,e.gatePassFrom,smooth(Math.min(1,(t-.90)/.06)));}
-  else{if(e.gatePassStart===null){e.gatePassStart=realTime*1000;e.gatePassFrom=p.clone();qaEvent('special-ball-gate-entry',{round:batchIndex+1,index:7,n:e.b.n,gateState:diverterGateState});}const pass=Math.min(1,(realTime*1000-e.gatePassStart)/360);p.lerpVectors(e.gatePassFrom,slot,smooth(pass));if(pass>=.78&&!e.gateCrossed){e.gateCrossed=true;qaEvent('special-ball-gate-crossed',{round:batchIndex+1,index:7,n:e.b.n,gateState:diverterGateState});}if(pass>=1&&!e.gatePassed){e.gatePassed=true;qaEvent('special-ball-in-right-slot',{round:batchIndex+1,index:7,n:e.b.n,gateState:diverterGateState});setDiverterGate(false,batchIndex+1);setStageStatus('第七顆特別號已入右槽 · 活門關閉中');}}
+function simulate(dt){
+ const radius=1.385,centerY=.05,spin=spinDirection(elapsed);
+ for(const b of balls){
+  if(b.state==='rack'&&elapsed>(b.n-1)*.032){b.state='fall';b.vel.set(Math.sin(b.n*12.71)*.22,-.1,Math.cos(b.n*8.17)*.34);}
+  if(b.state!=='fall'&&b.state!=='drum')continue;
+  const p=b.mesh.position;
+  b.vel.y-=8.8*dt;
+  if(b.state==='drum'){
+   const rx=p.x,ry=p.y-centerY;
+   b.vel.x+=(-ry*spin*1.7+Math.sin(elapsed*4.1+b.n*2.37)*.9)*dt;
+   b.vel.y+=(rx*spin*1.7+Math.sin(elapsed*3.4+b.n*1.31)*.65)*dt;
+   b.vel.z+=Math.sin(elapsed*3+b.n*1.73)*1.15*dt;
+   const blade=Math.cos((Math.atan2(ry,rx)-rotor.rotation.z)*3);
+   if(p.y<-.52&&elapsed>(b.nextKick||0)&&blade>-.15){
+    b.vel.y=Math.max(b.vel.y,2.35+.55*(.5+.5*Math.sin(b.n*2.71+elapsed*5)));
+    b.vel.x+=Math.sin(b.n+elapsed*3)*.35;b.vel.z+=Math.cos(b.n+elapsed*2)*.24;
+    b.nextKick=elapsed+.48+(b.n%5)*.065;
+   }
+  }
+  b.vel.y=Math.min(3.3,b.vel.y);
+  const speed=b.vel.length();if(speed>4.6)b.vel.multiplyScalar(4.6/speed);
+  p.addScaledVector(b.vel,dt);
+  if(b.state==='fall'&&p.y<1.30){b.state='drum';playImpact(.19,.72);}
+  if(b.state==='drum'){
+   const radial=new THREE.Vector3(p.x,p.y-centerY,p.z),distance=radial.length();
+   if(distance>radius){
+    radial.normalize();p.copy(radial).multiplyScalar(radius);p.y+=centerY;
+    const normalSpeed=b.vel.dot(radial);
+    if(normalSpeed>0){b.vel.addScaledVector(radial,-1.58*normalSpeed);collisionSound(normalSpeed,.68);}
+   }
+  }
+  if(b.state==='drum'){
+   const depthLimit=machineModel.drumHalfDepth-.095;
+   if(p.z>depthLimit){p.z=depthLimit;if(b.vel.z>0)b.vel.z*=-.62;}
+   else if(p.z<-depthLimit){p.z=-depthLimit;if(b.vel.z<0)b.vel.z*=-.62;}
+  }
+  b.vel.multiplyScalar(Math.pow(.994,dt*60));
+  b.mesh.rotation.x+=b.vel.y*dt*2;b.mesh.rotation.z-=b.vel.x*dt*2;
  }
- else p.lerpVectors(tray,slot,smooth((t-.90)/.10));
- e.b.mesh.rotation.y+=.04;
- if((e.index!==6&&t>=1)||(e.index===6&&t>=1&&e.gatePassed)){e.b.state='drawn';e.b.mesh.rotation.set(0,.4,0);qaEvent('ball-in-cup',{round:batchIndex+1,index:e.index+1,n:e.b.n,color:colorOf(e.b.n),slot:e.index===6?'special':'main',gateState:e.index===6?diverterGateState:'not-applicable'});qaEvent(e.index===6?'special-ball-landed-right-slot':'main-ball-landed-left-slot',{round:batchIndex+1,index:e.index+1,n:e.b.n,drawOrder:e.index+1});if(e.index===6&&!e.sfx.slot){e.sfx.slot=true;playImpact(.15,.54);}reveal(e.b.n,e.index);extracting=null;if(quickActive)finishQuickDraw();}
+ for(let i=0;i<balls.length;i++){
+  const a=balls[i];if(a.state!=='drum')continue;
+  for(let j=i+1;j<balls.length;j++){
+   const b=balls[j];if(b.state!=='drum')continue;
+   temp.subVectors(a.mesh.position,b.mesh.position);const d=temp.length();
+   if(d<.19&&d>.00001){
+    temp.multiplyScalar(1/d);const overlap=(.19-d)*.5;
+    a.mesh.position.addScaledVector(temp,overlap);b.mesh.position.addScaledVector(temp,-overlap);
+    const rel=a.vel.clone().sub(b.vel).dot(temp);
+    if(rel<0){a.vel.addScaledVector(temp,-rel*.66);b.vel.addScaledVector(temp,rel*.66);collisionSound(-rel,.55);}
+   }
+  }
+ }
+}
+function extraction(){
+ if(!extracting&&nextIndex<order.length&&elapsed>=pickupStart(nextIndex)){
+  const b=balls.find(b=>b.n===order[nextIndex]);
+  const index=nextIndex;b.state='extract';
+  const duration=quickActive?1.35:(index===6?SPECIAL_PICKUP_DURATION:NORMAL_PICKUP_DURATION);
+  extracting={b,index,start:pickupStart(index),duration,from:b.mesh.position.clone(),tubeLogged:false,hiddenLogged:false,receiverLogged:false,junctionLogged:false,gateRequested:false,gatePassed:false,gateCloseRequested:false,sfx:{slot:false}};
+  qaEvent('ball-selected',{round:batchIndex+1,index:index+1,n:b.n});
+  $('status').textContent=index===6?'特別號在中央直管短暫停留':'選中球落入鼓底中央直管';
+  $('step').textContent=`第 ${index+1} / ${order.length} 顆`;nextIndex++;
+ }
+ if(!extracting)return;
+ const e=extracting,t=Math.min(1,(elapsed-e.start)/e.duration),p=e.b.mesh.position;
+ const mouth=selectorMouth.clone(),hidden=selectorOcclusion.clone(),slot=cupSlot(e.index);
+ const clamp01=x=>Math.max(0,Math.min(1,x));
+ const logTube=()=>{if(e.tubeLogged)return;e.tubeLogged=true;qaEvent('selector-tube-entry',{round:batchIndex+1,index:e.index+1,n:e.b.n});playImpact(.18,.72);};
+ const occlude=()=>{e.b.mesh.visible=false;p.copy(hidden);if(!e.hiddenLogged){e.hiddenLogged=true;qaEvent('selector-tube-occluded',{round:batchIndex+1,index:e.index+1,n:e.b.n});}};
+ const showAtRear=()=>{
+  if(!e.receiverLogged){e.receiverLogged=true;e.b.mesh.visible=true;showCupBall(e.b);p.copy(receiverEntryStart);qaEvent('receiver-rear-entry-visible',{round:batchIndex+1,index:e.index+1,n:e.b.n});qaEvent('cup-ball-visible',{round:batchIndex+1,index:e.index+1,n:e.b.n,color:colorOf(e.b.n),slot:e.index===6?'special':'main'});}
+  e.b.mesh.visible=true;showCupBall(e.b);
+ };
+ const markJunction=()=>{if(e.junctionLogged)return;e.junctionLogged=true;qaEvent('receiver-junction-reached',{round:batchIndex+1,index:e.index+1,n:e.b.n,slot:e.index===6?'special':'main'});};
+ const approachJunction=progress=>{showAtRear();const u=clamp01(progress);p.lerpVectors(receiverEntryStart,receiverJunction,smooth(u));e.b.mesh.rotation.z=-u*2.2;if(u>=1)markJunction();};
+ const moveIntoSlot=progress=>{showAtRear();const u=clamp01(progress);p.lerpVectors(receiverJunction,slot,smooth(u));e.b.mesh.rotation.z=(e.index===6?1:-1)*u*4.2;};
+ if(e.index!==6){
+  if(t<.18){e.b.mesh.visible=true;p.lerpVectors(e.from,mouth,smooth(t/.18));p.y+=Math.sin(Math.PI*t/.18)*.10;}
+  else if(t<.31){logTube();e.b.mesh.visible=true;p.lerpVectors(mouth,hidden,smooth((t-.18)/.13));}
+  else if(t<.60){logTube();occlude();}
+  else{
+   logTube();const routeProgress=clamp01((t-.60)/.40),approachRatio=.38;
+   if(routeProgress<approachRatio)approachJunction(routeProgress/approachRatio);
+   else{approachJunction(1);moveIntoSlot((routeProgress-approachRatio)/(1-approachRatio));}
+  }
+  if(t>=.96&&!e.sfx.slot){e.sfx.slot=true;playImpact(.15,.54);}
+  if(t>=1){
+   e.b.state='drawn';e.b.mesh.visible=true;e.b.mesh.rotation.set(0,.4,e.b.mesh.rotation.z);
+   qaEvent('ball-in-cup',{round:batchIndex+1,index:e.index+1,n:e.b.n,color:colorOf(e.b.n),slot:'main'});
+   qaEvent('main-ball-landed-left-slot',{round:batchIndex+1,index:e.index+1,n:e.b.n,drawOrder:e.index+1});
+   setStageStatus(`第 ${e.index+1} 顆已由交會點停入左側長槽`);reveal(e.b.n,e.index);extracting=null;if(quickActive)finishQuickDraw();
+  }
+  return;
+ }
+
+ // The special ball is hidden in the selector tube, then appears at the shared rear feed.
+ if(t<.055){e.b.mesh.visible=true;p.lerpVectors(e.from,mouth,smooth(t/.055));p.y+=Math.sin(Math.PI*t/.055)*.06;}
+ else if(t<.75){logTube();e.b.mesh.visible=true;p.copy(mouth);p.y+=.025*Math.sin((t-.055)*18);}
+ else if(t<.90){logTube();occlude();}
+ else{
+  logTube();const approachProgress=clamp01((t-.90)/.10),approachRatio=.42;
+  if(approachProgress<approachRatio)approachJunction(approachProgress/approachRatio);
+  else{
+   approachJunction(1);
+   if(!e.gateRequested){e.gateRequested=true;setDiverterGate(true,batchIndex+1);qaEvent('special-ball-waiting-for-gate',{round:batchIndex+1,index:7,n:e.b.n,gateState:diverterGateState});setStageStatus('第七顆已到共同交會點 · 特別號活門開啟中');}
+   if(diverterGateState==='open'||e.gatePassed){
+    const branchProgress=clamp01((approachProgress-approachRatio)/(1-approachRatio));moveIntoSlot(branchProgress);
+    if(!e.gatePassed&&branchProgress>=.04){e.gatePassed=true;qaEvent('special-ball-gate-crossed',{round:batchIndex+1,index:7,n:e.b.n,gateState:diverterGateState});setStageStatus('特別號已通過活門 · 轉入右側短槽');}
+    if(e.gatePassed&&!e.gateCloseRequested&&branchProgress>=.62){e.gateCloseRequested=true;setDiverterGate(false,batchIndex+1);}
+   }else{showAtRear();p.copy(receiverJunction);e.b.mesh.rotation.z=0;}
+  }
+ }
+ if(t>=1&&e.gatePassed){
+  e.b.state='drawn';e.b.mesh.visible=true;e.b.mesh.rotation.set(0,.4,e.b.mesh.rotation.z);
+  if(!e.sfx.slot){e.sfx.slot=true;playImpact(.15,.54);}
+  qaEvent('ball-in-cup',{round:batchIndex+1,index:7,n:e.b.n,color:colorOf(e.b.n),slot:'special',gateState:diverterGateState});
+  qaEvent('special-ball-in-right-slot',{round:batchIndex+1,index:7,n:e.b.n,gateState:diverterGateState});
+  qaEvent('special-ball-landed-right-slot',{round:batchIndex+1,index:7,n:e.b.n,drawOrder:7});
+  setStageStatus('第七顆特別號已停入右側短格');reveal(e.b.n,e.index);extracting=null;if(quickActive)finishQuickDraw();
+ }
 }
 const smooth=t=>t*t*(3-2*t);
 let realTime=0;
-function updateCamera(dt){let mode=resultShot?'results':view;if(mode==='auto')mode=phase==='running'?'close':'wide';const desired=new THREE.Vector3(),target=new THREE.Vector3();const aspect=camera.aspect;const fit=aspect<.67?1.12:1;if(mode==='results'){const distance=Math.max(3.4,1.2/(aspect*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))));desired.set(.15,-.12,1.04+distance);target.set(.15,-1.51,1.04);}else if(mode==='mix'){const distance=Math.max(6.8,3.7/aspect);desired.set(.45,.95,distance);target.set(0,-.15,.1);}else if(mode==='close'){desired.set(2.5,.8,7.7*fit);target.set(0,-.35,.18);}else if(mode==='orbit'){desired.set(Math.sin(realTime*.14)*5,2.45,Math.cos(realTime*.14)*3+9.9*fit);target.set(0,.92,0);}else{desired.set(2.6+mouseX*.25,2.65,15.0*fit);target.set(0,.95,0);}if(!resultShot&&view==='auto'&&phase==='running')fitNarrowRunningCamera(mode,desired,target);if(mode==='results'&&resultShot){resultShot.time+=dt;const t=reducedMotion()?1:smooth(Math.min(1,resultShot.time/2.6));camera.position.lerpVectors(resultShot.from,desired,t);cameraTarget.lerpVectors(resultShot.target,target,t);if(t===1&&!resultShotStable){resultShotStable=true;resultShotStableAt=0;pendingStableFrame={round:batchIndex+1,duration:resultShot.time};setStageStatus('結果特寫已穩定 · 即將下一注');resultShot=null;document.querySelectorAll('[data-view]:not([data-view="results"])').forEach(b=>b.disabled=false);if(phase==='done'&&!batchActive){setLiveDrawDisplay(false);selectView('auto');}}}else{const blend=reducedMotion()?1:1-Math.exp(-dt*1.8);camera.position.lerp(desired,blend);cameraTarget.lerp(target,blend);}camera.lookAt(cameraTarget);}
+function updateCamera(dt){
+ let mode=resultShot?'results':view;
+ if(mode==='auto'){
+  if(phase==='running'&&extracting){const progress=(elapsed-extracting.start)/extracting.duration;mode=progress>(extracting.index===6?.90:.60)?'results':'close';}
+  else if(phase==='running'&&elapsed<trayShotUntil)mode='results';
+  else if(phase==='running'){const cut=Math.floor(Math.max(0,elapsed-5)/7)%2;mode=elapsed<5||cut===0?'wide':'close';}
+  else mode='wide';
+ }
+ const desired=new THREE.Vector3(),target=new THREE.Vector3(),aspect=camera.aspect,fit=aspect<.67?1.12:1;
+ if(mode==='results'){
+  const distance=Math.max(2.2,1.75/(Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*aspect));
+  desired.set(-.18,-1.57+distance*.55,1.00+distance);target.set(-.18,-1.57,1.00);
+ }else if(mode==='mix'){
+  const distance=Math.max(6.2,3.3/aspect);desired.set(.32,.70,distance);target.set(0,.05,.05);
+ }else if(mode==='close'){
+  const distance=Math.max(6.0,3.0/aspect);desired.set(1.45,.65,distance);target.set(0,.05,.04);
+ }else if(mode==='orbit'){
+  desired.set(Math.sin(realTime*.14)*5,2.45,Math.cos(realTime*.14)*3+10.2*fit);target.set(0,.90,0);
+ }else{
+  desired.set(2.6+mouseX*.25,2.65,14.3*fit);target.set(0,.85,0);
+ }
+ if(!resultShot&&mode==='wide')fitNarrowRunningCamera(mode,desired,target);
+ if(mode==='results'&&resultShot){
+  resultShot.time+=dt;const t=reducedMotion()?1:smooth(Math.min(1,resultShot.time/2.6));
+  camera.position.lerpVectors(resultShot.from,desired,t);cameraTarget.lerpVectors(resultShot.target,target,t);
+  if(t===1&&!resultShotStable){
+   resultShotStable=true;resultShotStableAt=0;pendingStableFrame={round:batchIndex+1,duration:resultShot.time};
+   setStageStatus('六加一承接台特寫已穩定 · 即將下一注');resultShot=null;
+   document.querySelectorAll('[data-view]:not([data-view="results"])').forEach(b=>b.disabled=false);
+   if(phase==='done'&&!batchActive){setLiveDrawDisplay(false);selectView('auto');}
+  }
+ }else{const blend=reducedMotion()?1:1-Math.exp(-dt*(mode==='results'?2.5:1.8));camera.position.lerp(desired,blend);cameraTarget.lerp(target,blend);}
+ camera.lookAt(cameraTarget);
+}
 function captureMachineBounds(){const excluded=new Set(balls.map(b=>b.mesh)),coords=[],v=new THREE.Vector3();machineBounds=new THREE.Box3().makeEmpty();root.traverse(o=>{if(!o.isMesh||excluded.has(o)||!o.geometry?.attributes?.position)return;const pos=o.geometry.attributes.position;for(let i=0;i<pos.count;i++){v.fromBufferAttribute(pos,i).applyMatrix4(o.matrixWorld);coords.push(v.x,v.y,v.z);machineBounds.expandByPoint(v);}});machineFitVertices=new Float32Array(coords);}
 function fitNarrowRunningCamera(mode,desired,target){if(!machineBounds||!machineFitVertices||!fitProbeCamera)return;const center=machineBounds.getCenter(new THREE.Vector3()),ray=desired.clone().sub(target),baseDistance=ray.length();ray.normalize();const probe=fitProbeCamera,key=[mode,camera.aspect.toFixed(5),camera.fov.toFixed(3),...desired.toArray().map(v=>v.toFixed(3)),...target.toArray().map(v=>v.toFixed(3))].join('|');let fit=fitCameraCache.get(key);if(!fit){let distance=baseDistance,pivot=center.clone();probe.aspect=camera.aspect;probe.fov=camera.fov;probe.near=camera.near;probe.far=camera.far;probe.updateProjectionMatrix();probe.up.copy(camera.up);const v=new THREE.Vector3(),safeSpan=1.80;for(let iteration=0;iteration<24;iteration++){probe.position.copy(pivot).addScaledVector(ray,distance);probe.lookAt(pivot);probe.updateMatrixWorld(true);let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;for(let i=0;i<machineFitVertices.length;i+=3){v.set(machineFitVertices[i],machineFitVertices[i+1],machineFitVertices[i+2]).project(probe);minX=Math.min(minX,v.x);maxX=Math.max(maxX,v.x);minY=Math.min(minY,v.y);maxY=Math.max(maxY,v.y);}const spanY=maxY-minY,centerY=(minY+maxY)/2,halfView=distance*Math.tan(THREE.MathUtils.degToRad(camera.fov/2)),cosElevation=Math.max(.01,Math.sqrt(1-ray.y*ray.y));if(Math.abs(centerY)>.0005)pivot.y+=centerY*halfView/cosElevation;const extentX=Math.max(Math.abs(minX),Math.abs(maxX));if(Math.abs(centerY)<=.0005&&Math.abs(spanY-safeSpan)<=.001&&extentX<=.82)break;const ratio=spanY/safeSpan;if(Math.abs(ratio-1)>.0005)distance*=Math.pow(ratio,.9);if(extentX>.82)distance*=Math.pow(extentX/.82,.9);}fit={distance,pivotY:pivot.y};fitCameraCache.set(key,fit);}const fittedTarget=new THREE.Vector3(center.x,fit.pivotY,center.z);probe.position.copy(fittedTarget).addScaledVector(ray,fit.distance);desired.copy(probe.position);target.copy(fittedTarget);}
 function advanceTimeline(realSeconds){
@@ -179,9 +350,9 @@ function animate(){
  // Manual cycles advance only with rendered frames; background catch-up must never skip them.
  if(quickActive&&!paused)advanceTimeline(realDt);
  if(phase==='running'&&!paused){const dt=realDt*timelineRate(),physicsDt=Math.min(dt,.12),steps=Math.max(1,Math.ceil(physicsDt/.012));for(let i=0;i<steps;i++)simulate(physicsDt/steps);rotor.rotation.z+=dt*motorSpeed(elapsed);
- $('progressfill').style.width=Math.min(99,(elapsed/(quickActive?2.6:DRAW_END))*100)+'%';
- if(!extracting){$('status').textContent=(quickActive?'':`第 ${batchIndex+1} / ${batchTotal} 注 · `)+(quickActive?'正轉混珠':elapsed<3?'彩球入鼓':'自動攪珠中');$('step').textContent=`已揭曉 ${revealed.length} / ${order.length} 顆`;}
- setMotor(.028);const railT=extracting?(elapsed-extracting.start)/2.6:0;setRolling(railT>=.42&&railT<.90);
+ $('progressfill').style.width=Math.min(99,(elapsed/(quickActive?3.5:DRAW_END))*100)+'%';
+ if(!extracting){$('status').textContent=(quickActive?'':`第 ${batchIndex+1} / ${batchTotal} 注 · `)+(quickActive?'持續攪珠':elapsed<3?'彩球入鼓':'自動攪珠中');$('step').textContent=`已揭曉 ${revealed.length} / ${order.length} 顆`;}
+ setMotor(.028);const extractProgress=extracting?(elapsed-extracting.start)/extracting.duration:0;setRolling(!!extracting&&extractProgress>=.60&&extractProgress<.99);
  }else{setMotor(0);setRolling(false);}if(!paused)updateCamera(realDt);renderer.render(scene,camera);if(pendingStableFrame){resultShotStableAt=performance.now();qaEvent('result-shot-stable',{round:pendingStableFrame.round,duration:pendingStableFrame.duration});pendingStableFrame=null;}
 }
 setInterval(updateTimeline,250);
@@ -200,7 +371,7 @@ function initAudio(){
  motorNoise=audio.createBufferSource();motorNoise.buffer=buffer;motorNoise.loop=true;
  const filter=audio.createBiquadFilter();filter.type='lowpass';filter.frequency.value=340;
  const noiseGain=audio.createGain();noiseGain.gain.value=.65;motorNoise.connect(filter);filter.connect(noiseGain);noiseGain.connect(motor);motorNoise.start();
- // Continuous granular rolling texture follows the ball along the visible chute.
+ // Rolling texture is enabled only while a ball visibly travels in the receiver.
  const rollBuffer=audio.createBuffer(1,len,audio.sampleRate),rd=rollBuffer.getChannelData(0);
  for(let i=0;i<len;i++){const t=i/audio.sampleRate;rd[i]=(Math.random()*2-1)*(.24+.76*Math.pow(.5+.5*Math.sin(t*2*Math.PI*31),8));}
  const rollSource=audio.createBufferSource();rollSource.buffer=rollBuffer;rollSource.loop=true;
@@ -215,7 +386,7 @@ function ensureEffects(){
  }catch{status.textContent='此瀏覽器不支援攪珠音效，請使用新版瀏覽器。';}
 }
 function startAudio(){try{soundtrack.play().catch(()=>{$('musicstatus').textContent='《Gilded Winter Gala》載入／播放失敗，請檢查音檔後重試。';});}catch{$('musicstatus').textContent='《Gilded Winter Gala》載入／播放失敗，請檢查音檔後重試。';}}
-function setMotor(v){if(motor&&audio){motor.gain.setTargetAtTime(v*2.5,audio.currentTime,.08);motorTone.frequency.setTargetAtTime((spinDirection(elapsed)<0?48:61)*Math.sqrt(timelineRate()),audio.currentTime,.1);}}
+function setMotor(v){if(motor&&audio){motor.gain.setTargetAtTime(v*2.5,audio.currentTime,.08);motorTone.frequency.setTargetAtTime(57*Math.sqrt(timelineRate()),audio.currentTime,.1);}}
 function setRolling(active){if(rolling&&audio)rolling.gain.setTargetAtTime(active?.18:0,audio.currentTime,.018);}
 function collisionSound(speed,brightness){if(!audio||audio.state!=='running'||speed<.25||audio.currentTime-lastBallHit<.038)return;lastBallHit=audio.currentTime;playImpact(Math.min(.18,.045+speed*.035),brightness);}
 function playImpact(level=.16,brightness=.6){if(!audio||audio.state!=='running'||phase!=='running'||paused)return;const now=audio.currentTime,duration=.075+Math.random()*.055,len=Math.max(1,Math.floor(audio.sampleRate*duration)),buf=audio.createBuffer(1,len,audio.sampleRate),data=buf.getChannelData(0);for(let i=0;i<len;i++)data[i]=(Math.random()*2-1)*(1-i/len);const src=audio.createBufferSource(),filter=audio.createBiquadFilter(),gain=audio.createGain();src.buffer=buf;filter.type='bandpass';filter.frequency.value=500+brightness*1500;filter.Q.value=.7;gain.gain.setValueAtTime(level,now);gain.gain.exponentialRampToValueAtTime(.001,now+duration);src.connect(filter);filter.connect(gain);gain.connect(effectsBus);src.start(now);src.stop(now+duration);const thump=audio.createOscillator(),tg=audio.createGain();thump.type='sine';thump.frequency.setValueAtTime(105+Math.random()*35,now);thump.frequency.exponentialRampToValueAtTime(58,now+.075);tg.gain.setValueAtTime(level*.42,now);tg.gain.exponentialRampToValueAtTime(.001,now+.09);thump.connect(tg);tg.connect(effectsBus);thump.start(now);thump.stop(now+.1);src.onended=()=>{src.disconnect();filter.disconnect();gain.disconnect();};thump.onended=()=>{thump.disconnect();tg.disconnect();};}
