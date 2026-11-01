@@ -62,28 +62,6 @@ function makeReceiverLane(parent, { name, length, width, x, y, z, yaw, material,
   return lane;
 }
 
-function addBluePlaque(T, parent, name, label, x, y, z, width) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 96;
-  const context = canvas.getContext('2d');
-  context.fillStyle = '#284c48';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = '#fff4d5';
-  context.font = 'bold 36px sans-serif';
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText(label, canvas.width / 2, canvas.height / 2);
-  const texture = new T.CanvasTexture(canvas);
-  texture.colorSpace = T.SRGBColorSpace;
-  const plaque = new T.Mesh(new T.PlaneGeometry(width, 0.16), new T.MeshBasicMaterial({ map: texture, side: T.DoubleSide }));
-  plaque.name = name;
-  plaque.position.set(x, y, z);
-  plaque.renderOrder = 3;
-  parent.add(plaque);
-  return plaque;
-}
-
 export function buildMachine(_THREE, root, materials) {
   const T = _THREE || THREE_DEFAULT;
   const { gold, darkGold, brightGold, glass, edgeGlass } = materials;
@@ -191,8 +169,6 @@ export function buildMachine(_THREE, root, materials) {
     name: 'short-right-special-pocket', length: 0.98, width: 0.56,
     x: 0.76, y: -1.63, z: 1.11, yaw: -0.62, material: traySurface, trim: brightGold, openAt: 'left'
   });
-  addBluePlaque(T, frame, 'main-result-blue-plaque', '正選號 1–6', -0.66, -1.76, 1.695, 0.92);
-  addBluePlaque(T, frame, 'special-result-blue-plaque', '特別號', 0.76, -1.76, 1.695, 0.92);
   const receiverEntryStart = new T.Vector3(0.35, -1.485, 0.20);
   const receiverJunction = new T.Vector3(0.35, -1.485, 0.82);
 

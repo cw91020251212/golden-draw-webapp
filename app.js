@@ -1,5 +1,5 @@
 import * as THREE from './three.module.js';
-import { buildMachine } from './machine-model.js?v=restore-blue-plaques-1';
+import { buildMachine } from './machine-model.js?v=remove-result-plaques-1';
 import {CompatibleRenderer} from './compat.js?v=shared-entry-final-1';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
 const $=id=>document.getElementById(id);
