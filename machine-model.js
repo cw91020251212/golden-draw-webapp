@@ -294,12 +294,17 @@ export function buildMachine(_THREE, root, materials) {
   const zIn1 = innerW / 2;
   const leftInner = -1.64;
   const leftOuter = leftInner - wallT;
-  const rightInner = 0.48;
-  const rightOuter = rightInner + wallT;
   const endY = 0.24;
   const peakY = 0.58;
   // Flat landing between the wings. The same plane runs back as the tunnel floor.
   const flatHalf = 0.24;
+  // Same pitch on both wings. The right wing is only shorter, so it drops less.
+  const leftRun = -flatHalf - leftInner;
+  const slope = (peakY - endY) / leftRun;
+  const rightRun = 0.34;
+  const rightInner = flatHalf + rightRun;
+  const rightOuter = rightInner + wallT;
+  const rightEndY = peakY - slope * rightRun;
   const tunnelRear = -0.62;
   const channelZ = 0;
   const zBack = zIn0 - wallT / 2;
@@ -367,7 +372,7 @@ export function buildMachine(_THREE, root, materials) {
     V(leftInner, endY, 0),
     V(-flatHalf, peakY, 0),
     V(flatHalf, peakY, 0),
-    V(rightInner, endY, 0)
+    V(rightInner, rightEndY, 0)
   ];
   function addRibbon(name, bottom, top, material) {
     const positions = [];
@@ -418,8 +423,8 @@ export function buildMachine(_THREE, root, materials) {
   }
   // Floor top, one surface. Centre flat continues back as the tunnel floor.
   const floorVerts = [
-    V(leftInner, endY, zF), V(-flatHalf, peakY, zF), V(flatHalf, peakY, zF), V(rightInner, endY, zF),
-    V(leftInner, endY, zB), V(-flatHalf, peakY, zB), V(flatHalf, peakY, zB), V(rightInner, endY, zB),
+    V(leftInner, endY, zF), V(-flatHalf, peakY, zF), V(flatHalf, peakY, zF), V(rightInner, rightEndY, zF),
+    V(leftInner, endY, zB), V(-flatHalf, peakY, zB), V(flatHalf, peakY, zB), V(rightInner, rightEndY, zB),
     V(-flatHalf, peakY, zT), V(flatHalf, peakY, zT)
   ];
   addSolidFromTop('trough-body', floorVerts, [
@@ -447,14 +452,14 @@ export function buildMachine(_THREE, root, materials) {
   const leftBackBottom = [V(leftInner, endY, zB), V(-flatHalf, peakY, zB), V(-flatHalf, peakY, zT)];
   const leftBackTop = leftBackBottom.map(p => V(p.x, p.y + backLift, p.z));
   addRibbon('back-left', leftBackBottom, leftBackTop, woodWall);
-  const rightBackBottom = [V(rightInner, endY, zB), V(flatHalf, peakY, zB), V(flatHalf, peakY, zT)];
+  const rightBackBottom = [V(rightInner, rightEndY, zB), V(flatHalf, peakY, zB), V(flatHalf, peakY, zT)];
   const rightBackTop = rightBackBottom.map(p => V(p.x, p.y + backLift, p.z));
   addRibbon('back-right', rightBackBottom, rightBackTop, woodWall);
 
   addBox(tray, 'left-end-wall', wallT, endY + backLift, zF - zB, woodWall,
     leftOuter + wallT / 2, (endY + backLift) / 2, (zF + zB) / 2);
-  addBox(tray, 'right-end-wall', wallT, endY + backLift, zF - zB, woodWall,
-    rightOuter - wallT / 2, (endY + backLift) / 2, (zF + zB) / 2);
+  addBox(tray, 'right-end-wall', wallT, rightEndY + backLift, zF - zB, woodWall,
+    rightOuter - wallT / 2, (rightEndY + backLift) / 2, (zF + zB) / 2);
 
   // Empty group so the old gate call has nothing visible to raise across the peak.
   const retainer = new T.Group();
@@ -468,7 +473,7 @@ export function buildMachine(_THREE, root, materials) {
     { x: leftInner, y: endY },
     { x: -flatHalf, y: peakY },
     { x: flatHalf, y: peakY },
-    { x: rightInner, y: endY }
+    { x: rightInner, y: rightEndY }
   ];
 
   function floorTopY(x) {
@@ -479,13 +484,14 @@ export function buildMachine(_THREE, root, materials) {
     }
     if (clamped >= flatHalf) {
       const u = (clamped - flatHalf) / (rightInner - flatHalf);
-      return peakY + (endY - peakY) * u + 0.02;
+      return peakY + (rightEndY - peakY) * u + 0.02;
     }
     return peakY + 0.02;
   }
   function floorAngle(x) {
-    if (x < -flatHalf) return Math.atan2(peakY - endY, -flatHalf - leftInner);
-    if (x > flatHalf) return Math.atan2(endY - peakY, rightInner - flatHalf);
+    const pitch = Math.atan2(peakY - endY, -flatHalf - leftInner);
+    if (x < -flatHalf) return pitch;
+    if (x > flatHalf) return -pitch;
     return 0;
   }
   function pointOnFloor(x) {
@@ -533,13 +539,13 @@ export function buildMachine(_THREE, root, materials) {
       outlinePoint(leftOuter, endY + 0.30, zBack),
       outlinePoint(-flatHalf, peakY + 0.30, zBack),
       outlinePoint(flatHalf, peakY + 0.30, zBack),
-      outlinePoint(rightOuter, endY + 0.30, zBack)
+      outlinePoint(rightOuter, rightEndY + 0.30, zBack)
     ],
     glass: [
       outlinePoint(leftInner, endY + 0.04, zFront),
       outlinePoint(-flatHalf, peakY + 0.04 + glassSeat, zFront),
       outlinePoint(flatHalf, peakY + 0.04 + glassSeat, zFront),
-      outlinePoint(rightInner, endY + 0.04, zFront)
+      outlinePoint(rightInner, rightEndY + 0.04, zFront)
     ]
   };
 
