@@ -1,6 +1,6 @@
 import * as THREE from './three.module.js';
-import { buildMachine } from './machine-model.js?v=tray-base-flush-15';
-import {CompatibleRenderer} from './compat.js?v=tray-base-flush-15';
+import { buildMachine } from './machine-model.js?v=tray-no-ring-16';
+import {CompatibleRenderer} from './compat.js?v=tray-no-ring-16';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
 const $=id=>document.getElementById(id);
 const reds=new Set([1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46]);
@@ -65,8 +65,6 @@ diverterGatePivot=machineModel.diverterGatePivot;
 const floorMat=new THREE.MeshStandardMaterial({color:0x254755,roughness:.55,metalness:.2});
 const floor=new THREE.Mesh(new THREE.CylinderGeometry(2.7,2.95,.20,96),floorMat);
 floor.position.y=-3.62;floor.receiveShadow=true;scene.add(floor);
-const stageRing=new THREE.Mesh(new THREE.TorusGeometry(2.71,.012,8,120),gold);
-stageRing.rotation.x=Math.PI/2;stageRing.position.y=-2.92;scene.add(stageRing);
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.ShadowMaterial({opacity:.22}));
 ground.rotation.x=-Math.PI/2;ground.position.y=-3.72;ground.receiveShadow=true;scene.add(ground);
 for(let i=0;i<49;i++){const n=i+1,m=new THREE.Mesh(sphereGeo,new THREE.MeshStandardMaterial({map:ballTexture(n),roughness:.28,metalness:.08}));m.castShadow=true;root.add(m);balls.push({n,mesh:m,plainMaterial:m.material,vel:new THREE.Vector3(),state:'rack',rack:machineModel.rackPosition(i)});}
