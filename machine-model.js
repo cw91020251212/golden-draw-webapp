@@ -169,16 +169,17 @@ export function buildMachine(_THREE, root, materials) {
   const drumDepth = 1.06;
 
   // Gold cabinet, round feet, and the lotteries nameplate from the machine photos.
-  addBox(frame, 'lower-cabinet', 2.85, 0.64, 1.36, darkGold, 0.02, -2.40, 0.30);
-  addBox(frame, 'cabinet-top', 2.72, 0.05, 1.24, gold, 0.02, -2.06, 0.34);
-  addBox(frame, 'cabinet-front-lip', 2.76, 0.07, 0.05, brightGold, 0.02, -2.10, 0.96);
+  // Base stays under the drum, but reaches left to carry the long tray arm.
+  addBox(frame, 'lower-cabinet', 3.70, 0.64, 1.36, darkGold, -0.42, -2.40, 0.30);
+  addBox(frame, 'cabinet-top', 3.55, 0.05, 1.24, gold, -0.42, -2.06, 0.34);
+  addBox(frame, 'cabinet-front-lip', 3.58, 0.07, 0.05, brightGold, -0.42, -2.10, 0.96);
   const plate = new T.Mesh(new T.BoxGeometry(1.72, 0.42, 0.02), new T.MeshStandardMaterial({
     map: nameplateTexture(), metalness: 0.35, roughness: 0.45, color: 0xfff1c4
   }));
   plate.name = 'hkjc-nameplate';
   plate.position.set(0.02, -2.46, 0.99);
   frame.add(plate);
-  for (const [x, z] of [[-1.12, 0.62], [1.16, 0.62], [-1.12, -0.15], [1.16, -0.15]]) {
+  for (const [x, z] of [[-1.95, 0.62], [1.15, 0.62], [-1.95, -0.15], [1.15, -0.15]]) {
     addBox(frame, 'foot-stem', 0.09, 0.16, 0.09, darkGold, x, -2.80, z);
     const foot = new T.Mesh(new T.CylinderGeometry(0.13, 0.15, 0.07, 28), gold);
     foot.name = 'round-foot';
@@ -278,7 +279,8 @@ export function buildMachine(_THREE, root, materials) {
   // leaving the open notch the chute drops into.
   const tray = new T.Group();
   tray.name = 'receiving-tray';
-  tray.position.set(0.02, -2.04, 0.78);
+  // Local x=0 is the drop, directly under the drum-centre chute.
+  tray.position.set(0, -2.04, 0.78);
   frame.add(tray);
 
   const woodWall = makeWoodMaterial(true);
@@ -288,15 +290,17 @@ export function buildMachine(_THREE, root, materials) {
   trayGlass.opacity = 0.42;
   trayGlass.color = new T.Color(0xd5e8ea);
 
-  const wallT = 0.12;
+  const wallT = 0.11;
   const innerW = 0.40;
   const zIn0 = -innerW / 2;
   const zIn1 = innerW / 2;
-  const leftOuter = -1.40;
-  const leftInner = leftOuter + wallT;
-  const slopeStart = 0.06;
-  const slopeEnd = 0.58;
-  const rightInner = 1.08;
+  // Six ball-widths of flat lower run sit entirely LEFT of the drop.
+  // The raised pocket is about one ball wide, with only a short stub to the right.
+  const leftInner = -1.86;
+  const leftOuter = leftInner - wallT;
+  const slopeStart = -0.52;
+  const slopeEnd = -0.12;
+  const rightInner = 0.18;
   const rightOuter = rightInner + wallT;
   const floorLeft = 0.30;
   const floorRight = 0.50;
@@ -396,19 +400,25 @@ export function buildMachine(_THREE, root, materials) {
   addBox(tray, 'left-end-wall', wallT, backTopLeft, innerW + wallT * 2, woodWall,
     leftOuter + wallT / 2, backTopLeft / 2, 0);
 
-  // Front wall. Its top edge is level, then climbs with the floor. Glass is
-  // seated in a groove just under that edge, set back from the outer face.
-  addTopWall(tray, 'front-wall-flat', leftOuter, frontTopLeft, slopeStart, frontTopLeft, zFront, wallT, woodWall);
-  addTopWall(tray, 'front-wall-slope', slopeStart, frontTopLeft, slopeEnd, frontTopSlopeEnd, zFront, wallT, woodWall);
+  // Front wall is a real opening, not a solid board with glass stuck on it.
+  // Sill up to the floor line, glass recessed in the groove, wood cap above.
+  const sillTop = floorLeft + 0.045;
+  const slopeSillTop = floorRight + 0.045;
+  addBox(tray, 'front-sill-flat', slopeStart - leftOuter, sillTop, wallT, woodWall,
+    (leftOuter + slopeStart) / 2, sillTop / 2, zFront);
+  addTopWall(tray, 'front-sill-slope', slopeStart, sillTop, slopeEnd, slopeSillTop, zFront, wallT, woodWall);
   addBox(tray, 'front-wall-right', rightInner - slopeEnd, frontTopRight, wallT, woodWall,
     (slopeEnd + rightInner) / 2, frontTopRight / 2, zFront);
+  // Vertical wood face where the low front wall meets the taller right pocket.
+  addBox(tray, 'front-divider-face', wallT * 0.8, frontTopRight - frontTopLeft, wallT, woodWall,
+    slopeEnd, frontTopLeft + (frontTopRight - frontTopLeft) / 2, zFront);
 
-  const glassZ = zFront - 0.012;
-  const grooveZ = zFront + 0.012;
-  addStrip(tray, 'glass-flat', leftInner + 0.02, floorLeft + 0.02, slopeStart, floorLeft + 0.02, glassZ, glassSeat, 0.012, trayGlass);
-  addStrip(tray, 'glass-slope', slopeStart, floorLeft + 0.02, slopeEnd, floorRight + 0.02, glassZ, glassSeat, 0.012, trayGlass);
-  addStrip(tray, 'glass-groove-flat', leftInner + 0.02, floorLeft + 0.015, slopeStart, floorLeft + 0.015, grooveZ, 0.012, 0.018, woodGroove);
-  addStrip(tray, 'glass-groove-slope', slopeStart, floorLeft + 0.015, slopeEnd, floorRight + 0.015, grooveZ, 0.012, 0.018, woodGroove);
+  const glassZ = zFront - 0.018;
+  const grooveZ = zFront + 0.02;
+  addStrip(tray, 'glass-flat', leftInner + 0.02, sillTop, slopeStart, sillTop, glassZ, glassSeat, 0.014, trayGlass);
+  addStrip(tray, 'glass-slope', slopeStart, sillTop, slopeEnd, slopeSillTop, glassZ, glassSeat, 0.014, trayGlass);
+  addStrip(tray, 'glass-groove-flat', leftInner + 0.02, sillTop - 0.004, slopeStart, sillTop - 0.004, grooveZ, 0.014, 0.02, woodGroove);
+  addStrip(tray, 'glass-groove-slope', slopeStart, sillTop - 0.004, slopeEnd, slopeSillTop - 0.004, grooveZ, 0.014, 0.02, woodGroove);
   addStrip(tray, 'front-cap-flat', leftOuter, frontTopLeft - capH, slopeStart, frontTopLeft - capH, zFront, capH, wallT, woodWall);
   addStrip(tray, 'front-cap-slope', slopeStart, frontTopLeft - capH, slopeEnd, frontTopSlopeEnd - capH, zFront, capH, wallT, woodWall);
 
@@ -461,7 +471,7 @@ export function buildMachine(_THREE, root, materials) {
 
   const mainRestX = [];
   for (let i = 0; i < 6; i++) mainRestX.push(leftInner + 0.04 + BALL_R + i * (BALL_D + 0.014));
-  const specialX = slopeEnd + (rightInner - slopeEnd) * 0.62;
+  const specialX = 0.02;
 
   frame.updateMatrixWorld(true);
   const toWorld = v => tray.localToWorld(v.clone());
@@ -481,7 +491,7 @@ export function buildMachine(_THREE, root, materials) {
     return pts;
   }
 
-  const chuteEndLocal = new T.Vector3(rightInner - 0.08, (endLowTop + backTopRight) / 2, 0.08);
+  const chuteEndLocal = new T.Vector3(0, endLowTop + 0.06, 0.04);
   const chuteEnd = toWorld(chuteEndLocal);
   // Clear chute from the centre tube down into the notched right-hand entry.
   const chuteDir = new T.Vector3().subVectors(chuteEnd, tubeExit);
