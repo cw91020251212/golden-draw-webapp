@@ -170,9 +170,9 @@ export function buildMachine(_THREE, root, materials) {
 
   // Gold cabinet, round feet, and the lotteries nameplate from the machine photos.
   // Base stays under the drum, but reaches left to carry the long tray arm.
-  addBox(frame, 'lower-cabinet', 3.70, 0.64, 1.36, darkGold, -0.42, -2.40, 0.30);
-  addBox(frame, 'cabinet-top', 3.55, 0.05, 1.24, gold, -0.42, -2.06, 0.34);
-  addBox(frame, 'cabinet-front-lip', 3.58, 0.07, 0.05, brightGold, -0.42, -2.10, 0.96);
+  addBox(frame, 'lower-cabinet', 3.70, 0.58, 1.55, darkGold, -0.42, -2.48, 0.55);
+  addBox(frame, 'cabinet-top', 3.55, 0.05, 1.45, gold, -0.42, -2.16, 0.62);
+  addBox(frame, 'cabinet-front-lip', 3.58, 0.06, 0.05, brightGold, -0.42, -2.18, 1.32);
   const plate = new T.Mesh(new T.BoxGeometry(1.72, 0.42, 0.02), new T.MeshStandardMaterial({
     map: nameplateTexture(), metalness: 0.35, roughness: 0.45, color: 0xfff1c4
   }));
@@ -277,7 +277,8 @@ export function buildMachine(_THREE, root, materials) {
   // slope is long (six balls); the right slope is short (the special ball).
   const tray = new T.Group();
   tray.name = 'receiving-tray';
-  tray.position.set(0, -2.04, 0.72);
+  // Below the drum and forward of it, with a clear gap. Local x=0 is the floor peak.
+  tray.position.set(0, -2.10, 1.18);
   frame.add(tray);
 
   const woodWall = makeWoodMaterial(true);
@@ -297,8 +298,6 @@ export function buildMachine(_THREE, root, materials) {
   const rightOuter = rightInner + wallT;
   const endY = 0.24;
   const peakY = 0.58;
-  const frontTop = 0.78;
-  const backTop = 1.02;
   const notchHalf = 0.18;
   const channelZ = 0;
   const zBack = zIn0 - wallT / 2;
@@ -355,33 +354,38 @@ export function buildMachine(_THREE, root, materials) {
   addTopWall(tray, 'floor-left-wing', leftInner, endY, 0, peakY, 0, innerW, woodFloor);
   addTopWall(tray, 'floor-right-wing', 0, peakY, rightInner, endY, 0, innerW, woodFloor);
 
-  // Back wall is the taller side, with a centre notch the chute enters.
-  const notchSill = peakY + 0.12;
-  addBox(tray, 'back-wall-left', -notchHalf - leftOuter, backTop, wallT, woodWall,
-    (leftOuter + -notchHalf) / 2, backTop / 2, zBack);
-  addBox(tray, 'back-wall-right', rightOuter - notchHalf, backTop, wallT, woodWall,
-    (notchHalf + rightOuter) / 2, backTop / 2, zBack);
-  addBox(tray, 'back-notch-sill', notchHalf * 2, notchSill, wallT, woodWall,
-    0, notchSill / 2, zBack);
+  // Each back board tracks its own wing: high at the centre notch, low at the outer end.
+  const backLift = 0.30;
+  addTopWall(tray, 'back-board-left', leftOuter, endY + backLift, -notchHalf, peakY + backLift, zBack, wallT, woodWall);
+  addTopWall(tray, 'back-board-right', notchHalf, peakY + backLift, rightOuter, endY + backLift, zBack, wallT, woodWall);
+  addBox(tray, 'back-notch-sill', notchHalf * 2, peakY * 0.55, wallT, woodWall, 0, peakY * 0.275, zBack);
 
-  addBox(tray, 'left-end-wall', wallT, backTop, innerW + wallT * 2, woodWall,
-    leftOuter + wallT / 2, backTop / 2, 0);
-  addBox(tray, 'right-end-wall', wallT, backTop, innerW + wallT * 2, woodWall,
-    rightOuter - wallT / 2, backTop / 2, 0);
+  addBox(tray, 'left-end-wall', wallT, endY + backLift, innerW + wallT * 2, woodWall,
+    leftOuter + wallT / 2, (endY + backLift) / 2, 0);
+  addBox(tray, 'right-end-wall', wallT, endY + backLift, innerW + wallT * 2, woodWall,
+    rightOuter - wallT / 2, (endY + backLift) / 2, 0);
 
-  // Vertical front baffle: wood sill and cap, clear glass in between.
-  const sillTop = endY - 0.02;
-  addBox(tray, 'front-sill', rightOuter - leftOuter, sillTop, wallT, woodWall,
-    (leftOuter + rightOuter) / 2, sillTop / 2, zFront);
-  addBox(tray, 'front-cap', rightOuter - leftOuter, capH, wallT, woodWall,
-    (leftOuter + rightOuter) / 2, frontTop - capH / 2, zFront);
-  const glassZ = zFront - 0.02;
-  const glassH = frontTop - capH - sillTop;
-  const trayFrontGlass = addBox(tray, 'front-glass', rightInner - leftInner, glassH, 0.012, trayGlass,
-    (leftInner + rightInner) / 2, sillTop + glassH / 2, glassZ);
-  trayFrontGlass.castShadow = false;
-  addBox(tray, 'front-groove', rightInner - leftInner, 0.016, 0.02, woodGroove,
-    (leftInner + rightInner) / 2, sillTop + 0.004, zFront + 0.015);
+  // Front glass is a slanted slide on each wing. Its top edge follows the floor V.
+  function addSlopedGlass(name, x0, y0, x1, y1) {
+    const dx = x1 - x0, dy = y1 - y0;
+    const len = Math.hypot(dx, dy) || 0.001;
+    const angle = Math.atan2(dy, dx);
+    const group = new T.Group();
+    group.name = name;
+    group.position.set((x0 + x1) / 2, (y0 + y1) / 2, zFront - 0.01);
+    group.rotation.z = angle;
+    const pane = new T.Mesh(new T.BoxGeometry(len, glassSeat, 0.012), trayGlass);
+    pane.position.y = glassSeat / 2;
+    pane.rotation.x = -0.42;
+    pane.castShadow = false;
+    group.add(pane);
+    const lip = new T.Mesh(new T.BoxGeometry(len, 0.035, wallT), woodWall);
+    lip.position.set(0, 0.01, 0.02);
+    group.add(lip);
+    tray.add(group);
+  }
+  addSlopedGlass('glass-left', leftInner, endY + 0.04, -0.02, peakY + 0.04);
+  addSlopedGlass('glass-right', 0.02, peakY + 0.04, rightInner, endY + 0.04);
 
   // Empty group so the old gate call has nothing visible to raise across the peak.
   const retainer = new T.Group();
@@ -438,23 +442,28 @@ export function buildMachine(_THREE, root, materials) {
   function rollPath(index) { return pathBetween(0, mainRestX[index]); }
   const specialRoll = pathBetween(0, specialX);
 
-  const chuteEndLocal = new T.Vector3(0, peakY + 0.28, -innerW * 0.15);
+  const chuteEndLocal = new T.Vector3(0, peakY + 0.16, zBack - 0.02);
   const chuteEnd = toWorld(chuteEndLocal);
   // Clear chute from the centre tube down into the notched right-hand entry.
   const chuteDir = new T.Vector3().subVectors(chuteEnd, tubeExit);
   const chuteLen = chuteDir.length();
-  const chute = new T.Mesh(new T.BoxGeometry(0.20, 0.16, chuteLen), edgeGlass || glass);
-  chute.name = 'exit-chute';
-  chute.position.copy(tubeExit).add(chuteEnd).multiplyScalar(0.5);
-  chute.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), chuteDir.clone().normalize());
-  chute.castShadow = false;
-  frame.add(chute);
-  addBeam(frame, 'chute-rail-left',
-    [tubeExit.x - 0.10, tubeExit.y, tubeExit.z],
-    [chuteEnd.x - 0.10, chuteEnd.y, chuteEnd.z], 0.012, brightGold);
-  addBeam(frame, 'chute-rail-right',
-    [tubeExit.x + 0.10, tubeExit.y, tubeExit.z],
-    [chuteEnd.x + 0.10, chuteEnd.y, chuteEnd.z], 0.012, brightGold);
+  // T-stem: a short tunnel under the chute, forward of the drum, into the rear notch.
+  // It does not touch the drum shell.
+  const tunnel = new T.Group();
+  tunnel.name = 'centre-entry-tunnel';
+  tunnel.position.copy(tubeExit).add(chuteEnd).multiplyScalar(0.5);
+  tunnel.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), chuteDir.clone().normalize());
+  const tunnelFloor = new T.Mesh(new T.BoxGeometry(0.28, 0.04, chuteLen), woodFloor);
+  tunnelFloor.name = 'tunnel-floor';
+  tunnelFloor.position.y = -0.08;
+  tunnel.add(tunnelFloor);
+  for (const side of [-1, 1]) {
+    const rail = new T.Mesh(new T.BoxGeometry(0.035, 0.12, chuteLen), woodWall);
+    rail.name = side < 0 ? 'tunnel-rail-left' : 'tunnel-rail-right';
+    rail.position.set(side * 0.13, -0.01, 0);
+    tunnel.add(rail);
+  }
+  frame.add(tunnel);
 
   const peakRest = toWorld(pointOnFloor(0));
   const dropPath = [
@@ -469,16 +478,15 @@ export function buildMachine(_THREE, root, materials) {
   const trayOutline = {
     floor: samples.map(s => outlinePoint(s.x, s.y, zFront)),
     crest: [
-      outlinePoint(leftOuter, frontTop, zFront),
-      outlinePoint(rightOuter, frontTop, zFront),
-      outlinePoint(rightOuter, backTop, zBack),
-      outlinePoint(leftOuter, backTop, zBack)
+      outlinePoint(leftOuter, endY + 0.30, zBack),
+      outlinePoint(-notchHalf, peakY + 0.30, zBack),
+      outlinePoint(notchHalf, peakY + 0.30, zBack),
+      outlinePoint(rightOuter, endY + 0.30, zBack)
     ],
     glass: [
-      outlinePoint(leftInner, sillTop, zFront),
-      outlinePoint(rightInner, sillTop, zFront),
-      outlinePoint(rightInner, frontTop - capH, zFront),
-      outlinePoint(leftInner, frontTop - capH, zFront)
+      outlinePoint(leftInner, endY + 0.04, zFront),
+      outlinePoint(0, peakY + 0.04 + glassSeat, zFront),
+      outlinePoint(rightInner, endY + 0.04, zFront)
     ]
   };
 
