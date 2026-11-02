@@ -115,31 +115,47 @@ function makeWoodMaterial(vertical) {
   canvas.width = 256;
   canvas.height = 512;
   const g = canvas.getContext('2d');
-  g.fillStyle = '#e2c79a';
+  // Same warm oak as the pedestal: readable grain, not a washed-out plain panel.
+  g.fillStyle = '#c49a62';
   g.fillRect(0, 0, 256, 512);
-  for (let i = 0; i < 90; i++) {
-    const shade = 120 + Math.floor(Math.random() * 70);
-    g.strokeStyle = `rgba(${shade},${Math.floor(shade * 0.78)},${Math.floor(shade * 0.48)},${0.10 + Math.random() * 0.22})`;
-    g.lineWidth = 0.7 + Math.random() * 2.4;
+  for (let i = 0; i < 46; i++) {
+    const shade = 92 + Math.floor(Math.random() * 70);
+    g.strokeStyle = `rgba(${shade},${Math.floor(shade * 0.62)},${Math.floor(shade * 0.32)},${0.28 + Math.random() * 0.38})`;
+    g.lineWidth = 1.4 + Math.random() * 3.2;
     g.beginPath();
     if (vertical) {
       const x = Math.random() * 256;
       g.moveTo(x, 0);
-      g.lineTo(x + (Math.random() * 10 - 5), 512);
+      g.bezierCurveTo(x + 8, 160, x - 10, 340, x + 4, 512);
     } else {
       const y = Math.random() * 512;
       g.moveTo(0, y);
-      g.lineTo(256, y + (Math.random() * 14 - 7));
+      g.bezierCurveTo(80, y + 6, 170, y - 8, 256, y + 3);
+    }
+    g.stroke();
+  }
+  for (let i = 0; i < 18; i++) {
+    g.strokeStyle = `rgba(92,58,28,${0.15 + Math.random() * 0.2})`;
+    g.lineWidth = 0.6;
+    g.beginPath();
+    if (vertical) {
+      const x = Math.random() * 256;
+      g.moveTo(x, 0);
+      g.lineTo(x + (Math.random() * 6 - 3), 512);
+    } else {
+      const y = Math.random() * 512;
+      g.moveTo(0, y);
+      g.lineTo(256, y + (Math.random() * 8 - 4));
     }
     g.stroke();
   }
   const texture = new THREE_DEFAULT.CanvasTexture(canvas);
   texture.wrapS = THREE_DEFAULT.RepeatWrapping;
   texture.wrapT = THREE_DEFAULT.RepeatWrapping;
-  texture.repeat.set(vertical ? 0.8 : 1.6, vertical ? 1.4 : 0.7);
+  texture.repeat.set(vertical ? 1.1 : 1.8, vertical ? 1.6 : 0.85);
   texture.colorSpace = THREE_DEFAULT.SRGBColorSpace;
-  texture.anisotropy = 4;
-  return new THREE_DEFAULT.MeshStandardMaterial({ map: texture, color: 0xfff6e8, roughness: 0.78, metalness: 0.0 });
+  texture.anisotropy = 8;
+  return new THREE_DEFAULT.MeshStandardMaterial({ map: texture, color: 0xffffff, roughness: 0.74, metalness: 0.02 });
 }
 
 const RACK_COUNTS = [10, 10, 10, 10, 9];
@@ -160,6 +176,8 @@ export function rackPosition(index) {
 export function buildMachine(_THREE, root, materials) {
   const T = _THREE || THREE_DEFAULT;
   const { gold, darkGold, brightGold, glass, edgeGlass } = materials;
+  const woodWall = makeWoodMaterial(true);
+  const woodFloor = makeWoodMaterial(false);
   const frame = new T.Group();
   frame.name = 'mark-six-machine';
   root.add(frame);
@@ -168,12 +186,12 @@ export function buildMachine(_THREE, root, materials) {
   const drumRadius = 1.50;
   const drumDepth = 1.06;
 
-  // Gold cabinet, round feet, and the lotteries nameplate from the machine photos.
+  // Wood pedestal, same grain as the tray, with the lotteries nameplate.
   // Base stays under the drum, but reaches left to carry the long tray arm.
   // Plinth dropped with the tray so the catch floor can sit under the drum ring.
-  addBox(frame, 'lower-cabinet', 3.70, 0.36, 1.70, darkGold, -0.42, -3.08, 0.62);
-  addBox(frame, 'cabinet-top', 3.55, 0.04, 1.60, gold, -0.42, -2.90, 0.68);
-  addBox(frame, 'cabinet-front-lip', 3.58, 0.05, 0.05, brightGold, -0.42, -2.92, 1.46);
+  addBox(frame, 'lower-cabinet', 3.70, 0.36, 1.70, woodWall, -0.42, -3.08, 0.62);
+  addBox(frame, 'cabinet-top', 3.55, 0.04, 1.60, woodFloor, -0.42, -2.90, 0.68);
+  addBox(frame, 'cabinet-front-lip', 3.58, 0.05, 0.05, woodWall, -0.42, -2.92, 1.46);
   const plate = new T.Mesh(new T.BoxGeometry(1.72, 0.26, 0.02), new T.MeshStandardMaterial({
     map: nameplateTexture(), metalness: 0.35, roughness: 0.45, color: 0xfff1c4
   }));
@@ -263,15 +281,9 @@ export function buildMachine(_THREE, root, materials) {
     rotor.add(tip);
   }
 
-  // Short clear vertical tube at the bottom centre, then a clear chute into the right-hand entry.
-  const tube = new T.Mesh(new T.CylinderGeometry(0.13, 0.13, 0.26, 28, 1, true), edgeGlass || glass);
-  tube.name = 'centre-exit-tube';
-  tube.position.set(0, -1.16, 0.28);
-  frame.add(tube);
-  addCylinderZ(frame, 'exit-tube-rim', 0.16, 0.045, brightGold, 0, -1.02, 0.28, 28);
-  addCylinderZ(frame, 'exit-tube-foot', 0.16, 0.04, gold, 0, -1.28, 0.32, 28);
-  const selectorMouth = new T.Vector3(0, -1.04, 0.28);
-  const tubeExit = new T.Vector3(0, -1.28, 0.34);
+  // Mouth of the drum outlet. The clear guide tube is built once the tray floor is known.
+  const selectorMouth = new T.Vector3(0, -1.04, 0.30);
+  const tubeExit = new T.Vector3(0, -1.28, 0.30);
 
   // Hand-sketch tray: a rectangular wood block whose interior floor
   // peaks under the centre chute and slopes down both ways. The left
@@ -283,8 +295,6 @@ export function buildMachine(_THREE, root, materials) {
   tray.position.set(0, -2.82, 1.48);
   frame.add(tray);
 
-  const woodWall = makeWoodMaterial(true);
-  const woodFloor = makeWoodMaterial(false);
   const woodGroove = new T.MeshStandardMaterial({ color: 0x3a3128, roughness: 0.6, metalness: 0.04 });
   const trayGlass = glass.clone();
   trayGlass.opacity = 0.42;
@@ -310,6 +320,36 @@ export function buildMachine(_THREE, root, materials) {
   // Inner face of the rear stop, in tray space. World z is the drum axis,
   // so the stem runs under the sphere to the bottom-centre exit.
   const tunnelRear = -0.06 - tray.position.z;
+
+  // Clear acrylic pipe from the drum outlet down to about one ball above the catch floor.
+  const floorWorldY = tray.position.y + peakY;
+  const dropGap = BALL_D * 1.2;
+  const tubeBottomY = floorWorldY + dropGap;
+  const tubeTopY = -1.06;
+  const tubeZ = 0.30;
+  const tubeRadius = 0.15;
+  const dropTubeMat = (edgeGlass || glass).clone();
+  dropTubeMat.opacity = 0.45;
+  dropTubeMat.transparent = true;
+  dropTubeMat.depthWrite = false;
+  dropTubeMat.side = T.DoubleSide;
+  const guide = new T.Mesh(
+    new T.CylinderGeometry(tubeRadius, tubeRadius, tubeTopY - tubeBottomY, 32, 1, true),
+    dropTubeMat
+  );
+  guide.name = 'drop-guide-tube';
+  guide.position.set(0, (tubeTopY + tubeBottomY) / 2, tubeZ);
+  frame.add(guide);
+  const tubeRing = (y, name) => {
+    const ring = new T.Mesh(new T.TorusGeometry(tubeRadius, 0.016, 10, 28), brightGold);
+    ring.name = name;
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(0, y, tubeZ);
+    frame.add(ring);
+  };
+  tubeRing(tubeTopY, 'drop-tube-top-ring');
+  tubeRing(tubeBottomY, 'drop-tube-bottom-ring');
+  tubeExit.set(0, tubeBottomY, tubeZ);
   const channelZ = 0;
   const zBack = zIn0 - wallT / 2;
   const zFront = zIn1 + wallT / 2;
