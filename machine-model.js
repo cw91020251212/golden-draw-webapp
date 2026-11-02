@@ -189,14 +189,17 @@ export function buildMachine(_THREE, root, materials) {
   // Wood pedestal, same grain as the tray, with the lotteries nameplate.
   // Base stays under the drum, but reaches left to carry the long tray arm.
   // Plinth dropped with the tray so the catch floor can sit under the drum ring.
-  addBox(frame, 'lower-cabinet', 3.70, 0.36, 1.70, woodWall, -0.42, -3.08, 0.62);
-  addBox(frame, 'cabinet-top', 3.55, 0.04, 1.60, woodFloor, -0.42, -2.90, 0.68);
-  addBox(frame, 'cabinet-front-lip', 3.58, 0.05, 0.05, woodWall, -0.42, -2.92, 1.46);
+  const baseCenterZ = 0.62;
+  const baseDepth = 1.70;
+  const baseFrontZ = baseCenterZ + baseDepth / 2;
+  addBox(frame, 'lower-cabinet', 3.70, 0.36, baseDepth, woodWall, -0.42, -3.08, baseCenterZ);
+  addBox(frame, 'cabinet-top', 3.55, 0.04, 1.60, woodFloor, -0.42, -2.90, baseFrontZ - 0.80);
+  addBox(frame, 'cabinet-front-lip', 3.58, 0.05, 0.05, woodWall, -0.42, -2.92, baseFrontZ - 0.025);
   const plate = new T.Mesh(new T.BoxGeometry(1.72, 0.26, 0.02), new T.MeshStandardMaterial({
     map: nameplateTexture(), metalness: 0.35, roughness: 0.45, color: 0xfff1c4
   }));
   plate.name = 'hkjc-nameplate';
-  plate.position.set(0.02, -3.08, 1.48);
+  plate.position.set(0.02, -3.08, baseFrontZ + 0.01);
   frame.add(plate);
   for (const [x, z] of [[-1.95, 0.62], [1.15, 0.62], [-1.95, -0.15], [1.15, -0.15]]) {
     addBox(frame, 'foot-stem', 0.09, 0.22, 0.09, darkGold, x, -3.38, z);
@@ -290,9 +293,9 @@ export function buildMachine(_THREE, root, materials) {
   // slope is long (six balls); the right slope is short (the special ball).
   const tray = new T.Group();
   tray.name = 'receiving-tray';
-  // Catch floor sits well below the drum exit. The trough body stays in front;
-  // the T-stem reaches back under the chute. Local x=0 is the flat centre.
-  tray.position.set(0, -2.82, 1.48);
+  // Catch floor sits well below the drum exit. The trough stays in front of
+  // the sphere, and its front face is flush with the pedestal. Local x=0 is the flat centre.
+  tray.position.set(0, -2.82, 0);
   frame.add(tray);
 
   const woodGroove = new T.MeshStandardMaterial({ color: 0x3a3128, roughness: 0.6, metalness: 0.04 });
@@ -302,6 +305,7 @@ export function buildMachine(_THREE, root, materials) {
 
   const wallT = 0.10;
   const innerW = 0.42;
+  tray.position.z = baseFrontZ - innerW / 2;
   const zIn0 = -innerW / 2;
   const zIn1 = innerW / 2;
   const leftInner = -1.64;
