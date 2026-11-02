@@ -479,23 +479,12 @@ export function buildMachine(_THREE, root, materials) {
     [1, 2, 6, 5],
     [2, 3, 7, 6]
   ], woodFloor);
-  const frontLoop = [0, 1, 2, 3];
-  addRibbon('trough-front-skirt',
-    frontLoop.map(i => V(floorVerts[i].x, 0, floorVerts[i].z)),
-    frontLoop.map(i => floorVerts[i].clone()),
-    woodWall);
-
-  // Solid plank. Top face is the same flat plane as the centre landing.
+  // Joinery: end walls and the rear wall run long. Every other board
+  // stops against a face, with one thickness of the long board left proud.
   const slab = 0.09;
-  const stemLen = zB - zT;
-  const tunnelFloor = new T.Mesh(new T.BoxGeometry(flatHalf * 2, slab, stemLen), woodFloor);
-  tunnelFloor.name = 'tunnel-floor';
-  tunnelFloor.position.set(0, peakY - slab / 2, (zB + zT) / 2);
-  tunnelFloor.castShadow = true;
-  tunnelFloor.receiveShadow = true;
-  tray.add(tunnelFloor);
-
-  // Timber of the same thickness as the end walls. Inner face stays on the channel.
+  const zRearBack = zB - wallT;
+  const zEndBack = zRearBack - wallT;
+  const zEndFront = zF + wallT;
   function addTimber(name, a0, a1, a2, a3, b0, b1, b2, b3) {
     const verts = [a0, a1, a2, a3, b0, b1, b2, b3];
     const positions = [];
@@ -520,39 +509,56 @@ export function buildMachine(_THREE, root, materials) {
     mesh.receiveShadow = true;
     tray.add(mesh);
   }
-  const zOuter = zB - wallT;
-  // Rear wall of each wing, sloped top, full body height.
+  // Side walls run past the front board and past the rear board.
+  addBox(tray, 'left-end-wall', wallT, endY + backLift, zEndFront - zEndBack, woodWall,
+    leftOuter + wallT / 2, (endY + backLift) / 2, (zEndFront + zEndBack) / 2);
+  addBox(tray, 'right-end-wall', wallT, rightEndY + backLift, zEndFront - zEndBack, woodWall,
+    rightOuter - wallT / 2, (rightEndY + backLift) / 2, (zEndFront + zEndBack) / 2);
+  // Rear wall runs sideways past the stem, so the stem ends on its back face.
   addTimber('rear-wall-left',
-    V(leftInner, 0, zB), V(leftInner, endY + backLift, zB), V(-flatHalf - wallT, peakY + backLift, zB), V(-flatHalf - wallT, 0, zB),
-    V(leftInner, 0, zOuter), V(leftInner, endY + backLift, zOuter), V(-flatHalf - wallT, peakY + backLift, zOuter), V(-flatHalf - wallT, 0, zOuter));
+    V(leftInner, 0, zB), V(leftInner, endY + backLift, zB), V(-flatHalf, peakY + backLift, zB), V(-flatHalf, 0, zB),
+    V(leftInner, 0, zRearBack), V(leftInner, endY + backLift, zRearBack), V(-flatHalf, peakY + backLift, zRearBack), V(-flatHalf, 0, zRearBack));
   addTimber('rear-wall-right',
-    V(flatHalf + wallT, 0, zB), V(flatHalf + wallT, peakY + backLift, zB), V(rightInner, rightEndY + backLift, zB), V(rightInner, 0, zB),
-    V(flatHalf + wallT, 0, zOuter), V(flatHalf + wallT, peakY + backLift, zOuter), V(rightInner, rightEndY + backLift, zOuter), V(rightInner, 0, zOuter));
-  // Sill under the stem mouth, so the back of the trough is closed timber.
-  addBox(tray, 'rear-wall-centre', flatHalf * 2, peakY - slab, wallT, woodWall,
+    V(flatHalf, 0, zB), V(flatHalf, peakY + backLift, zB), V(rightInner, rightEndY + backLift, zB), V(rightInner, 0, zB),
+    V(flatHalf, 0, zRearBack), V(flatHalf, peakY + backLift, zRearBack), V(rightInner, rightEndY + backLift, zRearBack), V(rightInner, 0, zRearBack));
+  addBox(tray, 'rear-wall-centre', (flatHalf + wallT) * 2, peakY - slab, wallT, woodWall,
     0, (peakY - slab) / 2, zB - wallT / 2);
-  // Stem side walls: same thickness, running back to the end stop.
+  // Front carcass boards die into the inner faces of the end walls.
+  addTimber('front-wall-left',
+    V(leftInner, 0, zF), V(leftInner, endY, zF), V(-flatHalf, peakY, zF), V(-flatHalf, 0, zF),
+    V(leftInner, 0, zF - wallT), V(leftInner, endY, zF - wallT), V(-flatHalf, peakY, zF - wallT), V(-flatHalf, 0, zF - wallT));
+  addTimber('front-wall-centre',
+    V(-flatHalf, 0, zF), V(-flatHalf, peakY, zF), V(flatHalf, peakY, zF), V(flatHalf, 0, zF),
+    V(-flatHalf, 0, zF - wallT), V(-flatHalf, peakY, zF - wallT), V(flatHalf, peakY, zF - wallT), V(flatHalf, 0, zF - wallT));
+  addTimber('front-wall-right',
+    V(flatHalf, 0, zF), V(flatHalf, peakY, zF), V(rightInner, rightEndY, zF), V(rightInner, 0, zF),
+    V(flatHalf, 0, zF - wallT), V(flatHalf, peakY, zF - wallT), V(rightInner, rightEndY, zF - wallT), V(rightInner, 0, zF - wallT));
+  // Stem sides stop on the rear wall behind and on the end-stop in front of them.
   const stemWallH = backLift + slab;
   const stemWallY = peakY + (backLift - slab) / 2;
-  const stemWallZ = (zB + zT) / 2;
+  const stemLen = zRearBack - zT;
   addBox(tray, 'stem-wall-left', wallT, stemWallH, stemLen, woodWall,
-    -flatHalf - wallT / 2, stemWallY, stemWallZ);
+    -flatHalf - wallT / 2, stemWallY, (zRearBack + zT) / 2);
   addBox(tray, 'stem-wall-right', wallT, stemWallH, stemLen, woodWall,
-    flatHalf + wallT / 2, stemWallY, stemWallZ);
-  // Cross board closing the far end. Spans both side walls.
-  addBox(tray, 'tunnel-end-stop', flatHalf * 2 + wallT * 2, stemWallH, wallT, woodWall,
+    flatHalf + wallT / 2, stemWallY, (zRearBack + zT) / 2);
+  // End stop runs past both stem sides so the lap is visible.
+  addBox(tray, 'tunnel-end-stop', flatHalf * 2 + wallT * 4, stemWallH, wallT, woodWall,
     0, stemWallY, zT - wallT / 2);
+  // Plank housed into the rear wall and into the end stop. Top stays the flat centre.
+  const plankBack = zT - wallT;
+  const plankLen = zB - plankBack;
+  const tunnelFloor = new T.Mesh(new T.BoxGeometry(flatHalf * 2, slab, plankLen), woodFloor);
+  tunnelFloor.name = 'tunnel-floor';
+  tunnelFloor.position.set(0, peakY - slab / 2, (zB + plankBack) / 2);
+  tunnelFloor.castShadow = true;
+  tunnelFloor.receiveShadow = true;
+  tray.add(tunnelFloor);
 
   // Front glass: one ribbon. Bottom sits on the floor's front edge; top stays a constant height above it.
   const glassBottom = profile.map(p => V(p.x, p.y, zF));
   const glassTop = profile.map(p => V(p.x, p.y + glassH, zF - glassLean));
   const frontGlassRibbon = addRibbon('front-glass', glassBottom, glassTop, trayGlass);
   frontGlassRibbon.castShadow = false;
-
-  addBox(tray, 'left-end-wall', wallT, endY + backLift, zF - zB, woodWall,
-    leftOuter + wallT / 2, (endY + backLift) / 2, (zF + zB) / 2);
-  addBox(tray, 'right-end-wall', wallT, rightEndY + backLift, zF - zB, woodWall,
-    rightOuter - wallT / 2, (rightEndY + backLift) / 2, (zF + zB) / 2);
 
   // Empty group so the old gate call has nothing visible to raise across the peak.
   const retainer = new T.Group();
