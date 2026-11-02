@@ -298,7 +298,9 @@ export function buildMachine(_THREE, root, materials) {
   const rightOuter = rightInner + wallT;
   const endY = 0.24;
   const peakY = 0.58;
-  const notchHalf = 0.18;
+  // Flat landing between the wings. The same plane runs back as the tunnel floor.
+  const flatHalf = 0.24;
+  const tunnelRear = -0.62;
   const channelZ = 0;
   const zBack = zIn0 - wallT / 2;
   const zFront = zIn1 + wallT / 2;
@@ -350,15 +352,23 @@ export function buildMachine(_THREE, root, materials) {
     return mesh;
   }
 
-  // Two solid wedges: high at x=0, falling to both ends. That is the pitched floor.
-  addTopWall(tray, 'floor-left-wing', leftInner, endY, 0, peakY, 0, innerW, woodFloor);
-  addTopWall(tray, 'floor-right-wing', 0, peakY, rightInner, endY, 0, innerW, woodFloor);
+  // Left ramp, flat centre, right ramp. The ramps meet the flat; they do not meet each other.
+  addTopWall(tray, 'floor-left-wing', leftInner, endY, -flatHalf, peakY, 0, innerW, woodFloor);
+  addTopWall(tray, 'floor-right-wing', flatHalf, peakY, rightInner, endY, 0, innerW, woodFloor);
+  // One continuous flat: the centre landing, carried rearward as the T-slot floor.
+  addBox(tray, 'flat-centre-and-tunnel', flatHalf * 2, peakY, (zIn1 - tunnelRear), woodFloor,
+    0, peakY / 2, (tunnelRear + zIn1) / 2);
+  for (const side of [-1, 1]) {
+    const rail = addBox(tray, side < 0 ? 'tunnel-rail-left' : 'tunnel-rail-right',
+      0.04, 0.14, zBack - tunnelRear, woodWall,
+      side * (flatHalf - 0.02), peakY + 0.07, (tunnelRear + zBack) / 2);
+    rail.castShadow = true;
+  }
 
-  // Each back board tracks its own wing: high at the centre notch, low at the outer end.
+  // Back boards follow each wing, then stay level beside the flat centre.
   const backLift = 0.30;
-  addTopWall(tray, 'back-board-left', leftOuter, endY + backLift, -notchHalf, peakY + backLift, zBack, wallT, woodWall);
-  addTopWall(tray, 'back-board-right', notchHalf, peakY + backLift, rightOuter, endY + backLift, zBack, wallT, woodWall);
-  addBox(tray, 'back-notch-sill', notchHalf * 2, peakY * 0.55, wallT, woodWall, 0, peakY * 0.275, zBack);
+  addTopWall(tray, 'back-board-left', leftOuter, endY + backLift, -flatHalf, peakY + backLift, zBack, wallT, woodWall);
+  addTopWall(tray, 'back-board-right', flatHalf, peakY + backLift, rightOuter, endY + backLift, zBack, wallT, woodWall);
 
   addBox(tray, 'left-end-wall', wallT, endY + backLift, innerW + wallT * 2, woodWall,
     leftOuter + wallT / 2, (endY + backLift) / 2, 0);
@@ -384,8 +394,9 @@ export function buildMachine(_THREE, root, materials) {
     group.add(lip);
     tray.add(group);
   }
-  addSlopedGlass('glass-left', leftInner, endY + 0.04, -0.02, peakY + 0.04);
-  addSlopedGlass('glass-right', 0.02, peakY + 0.04, rightInner, endY + 0.04);
+  addSlopedGlass('glass-left', leftInner, endY + 0.04, -flatHalf, peakY + 0.04);
+  addSlopedGlass('glass-centre', -flatHalf, peakY + 0.04, flatHalf, peakY + 0.04);
+  addSlopedGlass('glass-right', flatHalf, peakY + 0.04, rightInner, endY + 0.04);
 
   // Empty group so the old gate call has nothing visible to raise across the peak.
   const retainer = new T.Group();
@@ -397,22 +408,26 @@ export function buildMachine(_THREE, root, materials) {
 
   const samples = [
     { x: leftInner, y: endY },
-    { x: 0, y: peakY },
+    { x: -flatHalf, y: peakY },
+    { x: flatHalf, y: peakY },
     { x: rightInner, y: endY }
   ];
 
   function floorTopY(x) {
     const clamped = Math.max(leftInner, Math.min(rightInner, x));
-    if (clamped <= 0) {
-      const u = (clamped - leftInner) / (0 - leftInner);
+    if (clamped <= -flatHalf) {
+      const u = (clamped - leftInner) / (-flatHalf - leftInner);
       return endY + (peakY - endY) * u + 0.02;
     }
-    const u = clamped / rightInner;
-    return peakY + (endY - peakY) * u + 0.02;
+    if (clamped >= flatHalf) {
+      const u = (clamped - flatHalf) / (rightInner - flatHalf);
+      return peakY + (endY - peakY) * u + 0.02;
+    }
+    return peakY + 0.02;
   }
   function floorAngle(x) {
-    if (x < 0) return Math.atan2(peakY - endY, -leftInner);
-    if (x > 0) return Math.atan2(endY - peakY, rightInner);
+    if (x < -flatHalf) return Math.atan2(peakY - endY, -flatHalf - leftInner);
+    if (x > flatHalf) return Math.atan2(endY - peakY, rightInner - flatHalf);
     return 0;
   }
   function pointOnFloor(x) {
@@ -442,29 +457,8 @@ export function buildMachine(_THREE, root, materials) {
   function rollPath(index) { return pathBetween(0, mainRestX[index]); }
   const specialRoll = pathBetween(0, specialX);
 
-  const chuteEndLocal = new T.Vector3(0, peakY + 0.16, zBack - 0.02);
+  const chuteEndLocal = new T.Vector3(0, peakY + 0.02, tunnelRear + 0.08);
   const chuteEnd = toWorld(chuteEndLocal);
-  // Clear chute from the centre tube down into the notched right-hand entry.
-  const chuteDir = new T.Vector3().subVectors(chuteEnd, tubeExit);
-  const chuteLen = chuteDir.length();
-  // T-stem: a short tunnel under the chute, forward of the drum, into the rear notch.
-  // It does not touch the drum shell.
-  const tunnel = new T.Group();
-  tunnel.name = 'centre-entry-tunnel';
-  tunnel.position.copy(tubeExit).add(chuteEnd).multiplyScalar(0.5);
-  tunnel.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), chuteDir.clone().normalize());
-  const tunnelFloor = new T.Mesh(new T.BoxGeometry(0.28, 0.04, chuteLen), woodFloor);
-  tunnelFloor.name = 'tunnel-floor';
-  tunnelFloor.position.y = -0.08;
-  tunnel.add(tunnelFloor);
-  for (const side of [-1, 1]) {
-    const rail = new T.Mesh(new T.BoxGeometry(0.035, 0.12, chuteLen), woodWall);
-    rail.name = side < 0 ? 'tunnel-rail-left' : 'tunnel-rail-right';
-    rail.position.set(side * 0.13, -0.01, 0);
-    tunnel.add(rail);
-  }
-  frame.add(tunnel);
-
   const peakRest = toWorld(pointOnFloor(0));
   const dropPath = [
     selectorMouth.clone(),
@@ -479,13 +473,14 @@ export function buildMachine(_THREE, root, materials) {
     floor: samples.map(s => outlinePoint(s.x, s.y, zFront)),
     crest: [
       outlinePoint(leftOuter, endY + 0.30, zBack),
-      outlinePoint(-notchHalf, peakY + 0.30, zBack),
-      outlinePoint(notchHalf, peakY + 0.30, zBack),
+      outlinePoint(-flatHalf, peakY + 0.30, zBack),
+      outlinePoint(flatHalf, peakY + 0.30, zBack),
       outlinePoint(rightOuter, endY + 0.30, zBack)
     ],
     glass: [
       outlinePoint(leftInner, endY + 0.04, zFront),
-      outlinePoint(0, peakY + 0.04 + glassSeat, zFront),
+      outlinePoint(-flatHalf, peakY + 0.04 + glassSeat, zFront),
+      outlinePoint(flatHalf, peakY + 0.04 + glassSeat, zFront),
       outlinePoint(rightInner, endY + 0.04, zFront)
     ]
   };
