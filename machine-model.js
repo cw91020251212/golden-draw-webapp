@@ -321,12 +321,15 @@ export function buildMachine(_THREE, root, materials) {
   // so the stem runs under the sphere to the bottom-centre exit.
   const tunnelRear = -0.06 - tray.position.z;
 
-  // Clear acrylic pipe from the drum outlet down to about one ball above the catch floor.
+  // Clear pipe seated in the bottom outlet. It hangs downward only — the mouth
+  // is flush with the inner drum floor so balls can still reach the hole.
   const floorWorldY = tray.position.y + peakY;
-  const dropGap = BALL_D * 1.2;
+  const dropGap = BALL_D * 1.15;
   const tubeBottomY = floorWorldY + dropGap;
-  const tubeTopY = -1.06;
+  const drumInnerBottom = drumY - (drumRadius - 0.08);
+  const tubeTopY = drumInnerBottom - 0.015;
   const tubeZ = 0.30;
+  selectorMouth.set(0, drumInnerBottom, tubeZ);
   const tubeRadius = 0.15;
   const dropTubeMat = (edgeGlass || glass).clone();
   dropTubeMat.opacity = 0.45;
@@ -476,12 +479,11 @@ export function buildMachine(_THREE, root, materials) {
     [1, 2, 6, 5],
     [2, 3, 7, 6]
   ], woodFloor);
-  const perimeter = [0, 1, 2, 3, 7, 6, 5, 4];
-  const skirtBottom = perimeter.map(i => V(floorVerts[i].x, 0, floorVerts[i].z));
-  const skirtTop = perimeter.map(i => floorVerts[i].clone());
-  skirtBottom.push(skirtBottom[0].clone());
-  skirtTop.push(skirtTop[0].clone());
-  addRibbon('trough-skirt', skirtBottom, skirtTop, woodWall);
+  const frontLoop = [0, 1, 2, 3];
+  addRibbon('trough-front-skirt',
+    frontLoop.map(i => V(floorVerts[i].x, 0, floorVerts[i].z)),
+    frontLoop.map(i => floorVerts[i].clone()),
+    woodWall);
 
   // Solid plank. Top face is the same flat plane as the centre landing.
   const slab = 0.09;
@@ -492,24 +494,60 @@ export function buildMachine(_THREE, root, materials) {
   tunnelFloor.castShadow = true;
   tunnelFloor.receiveShadow = true;
   tray.add(tunnelFloor);
-  // Transverse end board. Closes the far end so a ball cannot roll out the back.
-  addBox(tray, 'tunnel-end-stop', flatHalf * 2 + 0.16, backLift + slab, wallT, woodWall,
-    0, peakY + (backLift - slab) / 2, zT - wallT / 2);
+
+  // Timber of the same thickness as the end walls. Inner face stays on the channel.
+  function addTimber(name, a0, a1, a2, a3, b0, b1, b2, b3) {
+    const verts = [a0, a1, a2, a3, b0, b1, b2, b3];
+    const positions = [];
+    const indices = [];
+    verts.forEach(v => positions.push(v.x, v.y, v.z));
+    const quads = [
+      [0, 1, 2, 3],
+      [4, 7, 6, 5],
+      [0, 4, 5, 1],
+      [1, 5, 6, 2],
+      [2, 6, 7, 3],
+      [3, 7, 4, 0]
+    ];
+    quads.forEach(([a, b, c, d]) => indices.push(a, b, c, a, c, d));
+    const geo = new T.BufferGeometry();
+    geo.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    const mesh = new T.Mesh(geo, woodWall);
+    mesh.name = name;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    tray.add(mesh);
+  }
+  const zOuter = zB - wallT;
+  // Rear wall of each wing, sloped top, full body height.
+  addTimber('rear-wall-left',
+    V(leftInner, 0, zB), V(leftInner, endY + backLift, zB), V(-flatHalf - wallT, peakY + backLift, zB), V(-flatHalf - wallT, 0, zB),
+    V(leftInner, 0, zOuter), V(leftInner, endY + backLift, zOuter), V(-flatHalf - wallT, peakY + backLift, zOuter), V(-flatHalf - wallT, 0, zOuter));
+  addTimber('rear-wall-right',
+    V(flatHalf + wallT, 0, zB), V(flatHalf + wallT, peakY + backLift, zB), V(rightInner, rightEndY + backLift, zB), V(rightInner, 0, zB),
+    V(flatHalf + wallT, 0, zOuter), V(flatHalf + wallT, peakY + backLift, zOuter), V(rightInner, rightEndY + backLift, zOuter), V(rightInner, 0, zOuter));
+  // Sill under the stem mouth, so the back of the trough is closed timber.
+  addBox(tray, 'rear-wall-centre', flatHalf * 2, peakY - slab, wallT, woodWall,
+    0, (peakY - slab) / 2, zB - wallT / 2);
+  // Stem side walls: same thickness, running back to the end stop.
+  const stemWallH = backLift + slab;
+  const stemWallY = peakY + (backLift - slab) / 2;
+  const stemWallZ = (zB + zT) / 2;
+  addBox(tray, 'stem-wall-left', wallT, stemWallH, stemLen, woodWall,
+    -flatHalf - wallT / 2, stemWallY, stemWallZ);
+  addBox(tray, 'stem-wall-right', wallT, stemWallH, stemLen, woodWall,
+    flatHalf + wallT / 2, stemWallY, stemWallZ);
+  // Cross board closing the far end. Spans both side walls.
+  addBox(tray, 'tunnel-end-stop', flatHalf * 2 + wallT * 2, stemWallH, wallT, woodWall,
+    0, stemWallY, zT - wallT / 2);
 
   // Front glass: one ribbon. Bottom sits on the floor's front edge; top stays a constant height above it.
   const glassBottom = profile.map(p => V(p.x, p.y, zF));
   const glassTop = profile.map(p => V(p.x, p.y + glassH, zF - glassLean));
   const frontGlassRibbon = addRibbon('front-glass', glassBottom, glassTop, trayGlass);
   frontGlassRibbon.castShadow = false;
-
-  // Back boards: one ribbon per side that turns the corner into the tunnel rail.
-  // Top edge is the floor profile plus a constant rise, including across the flat.
-  const leftBackBottom = [V(leftInner, endY, zB), V(-flatHalf, peakY, zB), V(-flatHalf, peakY, zT)];
-  const leftBackTop = leftBackBottom.map(p => V(p.x, p.y + backLift, p.z));
-  addRibbon('back-left', leftBackBottom, leftBackTop, woodWall);
-  const rightBackBottom = [V(rightInner, rightEndY, zB), V(flatHalf, peakY, zB), V(flatHalf, peakY, zT)];
-  const rightBackTop = rightBackBottom.map(p => V(p.x, p.y + backLift, p.z));
-  addRibbon('back-right', rightBackBottom, rightBackTop, woodWall);
 
   addBox(tray, 'left-end-wall', wallT, endY + backLift, zF - zB, woodWall,
     leftOuter + wallT / 2, (endY + backLift) / 2, (zF + zB) / 2);
