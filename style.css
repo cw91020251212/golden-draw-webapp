@@ -268,6 +268,7 @@ main{padding:12px clamp(14px,3vw,40px) 0}
 .controls-card>.secondary button{min-height:44px;padding:8px 6px;font-size:14px}
 .inline-settings{grid-area:settings;align-self:stretch;margin:0;border:1px solid #d8d8ca;border-radius:4px;background:#f8f7f0;color:#45564a}
 .inline-settings>summary{min-height:42px;display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:14px;font-weight:700;color:#425447;list-style-position:inside}
+.settings-close{display:inline-flex;align-items:center;justify-content:center;margin:4px 0 12px;min-height:44px;padding:8px 18px;border:1px solid #8d9a86;border-radius:8px;background:#fff;color:#30483a;font-weight:700}
 [data-settings-summary]{margin-left:auto;font-size:12px;font-weight:400;color:#59645b;white-space:nowrap}
 .inline-settings .settings{margin:0;padding:0 10px;border:0;background:transparent}
 .inline-settings .setting{padding:10px 0;gap:10px}

@@ -5,8 +5,8 @@ import * as THREE_DEFAULT from './three.module.js';
 // floor that rises to the right, and a short higher pocket with a notched
 // entry under the chute. Balls 1–6 roll left; the 7th stays in the pocket.
 
-const BALL_R = 0.095;
-const BALL_D = BALL_R * 2;
+export const BALL_R = 0.13;
+export const BALL_D = BALL_R * 2;
 
 function addBox(parent, name, width, height, depth, material, x, y, z) {
   const mesh = new THREE_DEFAULT.Mesh(new THREE_DEFAULT.BoxGeometry(width, height, depth), material);
@@ -159,9 +159,9 @@ function makeWoodMaterial(vertical) {
 }
 
 const RACK_COUNTS = [10, 10, 10, 10, 9];
-const RACK_GAP_X = 0.252;
-const RACK_GAP_Y = 0.208;
-const RACK_TOP_BALL_Y = 3.92;
+const RACK_GAP_X = 0.34;
+const RACK_GAP_Y = 0.275;
+const RACK_TOP_BALL_Y = 4.55;
 const RACK_Z = 0.06;
 
 export function rackPosition(index) {
@@ -222,20 +222,20 @@ export function buildMachine(_THREE, root, materials) {
   const rack = new T.Group();
   rack.name = 'five-column-magazine';
   frame.add(rack);
-  const rackBottom = 1.78, rackTop = 4.18, rackMid = (rackBottom + rackTop) / 2, rackHeight = rackTop - rackBottom;
-  addBox(rack, 'magazine-back', 1.42, rackHeight, 0.05, darkGold, 0, rackMid, -0.28);
-  addBox(rack, 'magazine-top-cap', 1.52, 0.07, 0.62, brightGold, 0, rackTop, 0.02);
-  addBox(rack, 'magazine-bottom-cap', 1.52, 0.08, 0.62, gold, 0, rackBottom, 0.02);
-  for (const x of [-0.72, 0.72]) addBox(rack, 'magazine-side', 0.055, rackHeight, 0.58, darkGold, x, rackMid, 0.02);
+  const rackBottom = 1.78, rackTop = 4.88, rackMid = (rackBottom + rackTop) / 2, rackHeight = rackTop - rackBottom;
+  addBox(rack, 'magazine-back', 1.78, rackHeight, 0.05, darkGold, 0, rackMid, -0.28);
+  addBox(rack, 'magazine-top-cap', 1.88, 0.07, 0.62, brightGold, 0, rackTop, 0.02);
+  addBox(rack, 'magazine-bottom-cap', 1.88, 0.08, 0.62, gold, 0, rackBottom, 0.02);
+  for (const x of [-0.90, 0.90]) addBox(rack, 'magazine-side', 0.055, rackHeight, 0.58, darkGold, x, rackMid, 0.02);
   for (let column = 0; column < 5; column++) {
     const x = (column - 2) * RACK_GAP_X;
-    const tube = new T.Mesh(new T.CylinderGeometry(0.118, 0.118, rackHeight - 0.16, 20, 1, true), edgeGlass || glass);
+    const tube = new T.Mesh(new T.CylinderGeometry(0.16, 0.16, rackHeight - 0.16, 20, 1, true), edgeGlass || glass);
     tube.name = `number-column-${column + 1}`;
     tube.position.set(x, rackMid, RACK_Z);
     rack.add(tube);
     if (column < 4) addBox(rack, 'magazine-divider', 0.016, rackHeight - 0.18, 0.03, brightGold, x + RACK_GAP_X / 2, rackMid, 0.30);
   }
-  const rackFace = new T.Mesh(new T.BoxGeometry(1.38, rackHeight - 0.12, 0.016), glass);
+  const rackFace = new T.Mesh(new T.BoxGeometry(1.72, rackHeight - 0.12, 0.016), glass);
   rackFace.name = 'magazine-front-glass';
   rackFace.position.set(0, rackMid, 0.32);
   rack.add(rackFace);
@@ -247,9 +247,10 @@ export function buildMachine(_THREE, root, materials) {
   drumWall.rotation.x = Math.PI / 2;
   drumWall.position.set(0, drumY, 0);
   frame.add(drumWall);
-  const frontGlass = new T.Mesh(new T.CircleGeometry(drumRadius - 0.11, 96), glass);
+  const glassZ = drumDepth / 2 - 0.012;
+  const frontGlass = new T.Mesh(new T.CircleGeometry(drumRadius - 0.18, 96), glass);
   frontGlass.name = 'drum-front-glass';
-  frontGlass.position.set(0, drumY, drumDepth / 2 - 0.02);
+  frontGlass.position.set(0, drumY, glassZ);
   frame.add(frontGlass);
   const backGlass = new T.Mesh(new T.CircleGeometry(drumRadius - 0.11, 96), glass);
   backGlass.name = 'drum-back-glass';
@@ -258,11 +259,16 @@ export function buildMachine(_THREE, root, materials) {
   frame.add(backGlass);
   addRing(frame, 'rear-rim', drumRadius, 0.05, -drumDepth / 2, darkGold);
   addRing(frame, 'front-rim', drumRadius, 0.078, drumDepth / 2, brightGold);
-  addRing(frame, 'front-rim-inner', drumRadius - 0.13, 0.022, drumDepth / 2 + 0.01, gold);
-  for (let i = 0; i < 18; i++) {
-    const a = i * Math.PI * 2 / 18;
-    const x = Math.cos(a) * drumRadius, y = Math.sin(a) * drumRadius + drumY;
-    addCylinderZ(frame, 'rim-bolt', 0.042, 0.04, darkGold, x, y, drumDepth / 2 + 0.055, 16);
+  addRing(frame, 'front-rim-inner', drumRadius - 0.13, 0.022, drumDepth / 2 + 0.008, gold);
+  // Domed covers sit on the front glass, just inside the bezel, over the screw heads.
+  const screwRadius = drumRadius - 0.30;
+  for (let i = 0; i < 16; i++) {
+    const a = -Math.PI / 2 + i * Math.PI * 2 / 16;
+    const cap = new T.Mesh(new T.SphereGeometry(0.042, 16, 12), brightGold);
+    cap.scale.z = 0.48;
+    cap.name = 'glass-screw-cover';
+    cap.position.set(Math.cos(a) * screwRadius, Math.sin(a) * screwRadius + drumY, glassZ + 0.014);
+    frame.add(cap);
   }
 
   // Six flat spokes on a gold hub. The hub turns; the drum shell stays fixed.
@@ -304,20 +310,18 @@ export function buildMachine(_THREE, root, materials) {
   trayGlass.color = new T.Color(0xd5e8ea);
 
   const wallT = 0.10;
-  const innerW = 0.42;
+  const innerW = 0.56;
   tray.position.z = baseFrontZ - innerW / 2;
   const zIn0 = -innerW / 2;
   const zIn1 = innerW / 2;
-  const leftInner = -1.64;
+  const leftInner = -2.02;
   const leftOuter = leftInner - wallT;
-  const endY = 0.24;
   const peakY = 0.58;
-  // Flat landing between the wings. The same plane runs back as the tunnel floor.
-  const flatHalf = 0.24;
-  // Same pitch on both wings. The right wing is only shorter, so it drops less.
+  const flatHalf = 0.30;
   const leftRun = -flatHalf - leftInner;
-  const slope = (peakY - endY) / leftRun;
-  const rightRun = 0.34;
+  const slope = 0.242857;
+  const endY = peakY - slope * leftRun;
+  const rightRun = 0.52;
   const rightInner = flatHalf + rightRun;
   const rightOuter = rightInner + wallT;
   const rightEndY = peakY - slope * rightRun;
@@ -334,7 +338,7 @@ export function buildMachine(_THREE, root, materials) {
   const tubeTopY = drumInnerBottom - 0.015;
   const tubeZ = 0.30;
   selectorMouth.set(0, drumInnerBottom, tubeZ);
-  const tubeRadius = 0.15;
+  const tubeRadius = BALL_R + 0.05;
   const dropTubeMat = (edgeGlass || glass).clone();
   dropTubeMat.opacity = 0.45;
   dropTubeMat.transparent = true;
@@ -636,8 +640,9 @@ export function buildMachine(_THREE, root, materials) {
   }
 
   const mainRestX = [];
-  for (let i = 0; i < 6; i++) mainRestX.push(leftInner + 0.06 + BALL_R + i * 0.23);
-  const specialX = rightInner - 0.06 - BALL_R;
+  const seatGap = BALL_D + 0.03;
+  for (let i = 0; i < 6; i++) mainRestX.push(leftInner + 0.09 + BALL_R + i * seatGap);
+  const specialX = rightInner - 0.09 - BALL_R;
 
   frame.updateMatrixWorld(true);
   const toWorld = v => tray.localToWorld(v.clone());
