@@ -170,27 +170,28 @@ export function buildMachine(_THREE, root, materials) {
 
   // Gold cabinet, round feet, and the lotteries nameplate from the machine photos.
   // Base stays under the drum, but reaches left to carry the long tray arm.
-  addBox(frame, 'lower-cabinet', 3.70, 0.58, 1.55, darkGold, -0.42, -2.48, 0.55);
-  addBox(frame, 'cabinet-top', 3.55, 0.05, 1.45, gold, -0.42, -2.16, 0.62);
-  addBox(frame, 'cabinet-front-lip', 3.58, 0.06, 0.05, brightGold, -0.42, -2.18, 1.32);
-  const plate = new T.Mesh(new T.BoxGeometry(1.72, 0.42, 0.02), new T.MeshStandardMaterial({
+  // Plinth dropped with the tray so the catch floor can sit under the drum ring.
+  addBox(frame, 'lower-cabinet', 3.70, 0.36, 1.70, darkGold, -0.42, -3.08, 0.62);
+  addBox(frame, 'cabinet-top', 3.55, 0.04, 1.60, gold, -0.42, -2.90, 0.68);
+  addBox(frame, 'cabinet-front-lip', 3.58, 0.05, 0.05, brightGold, -0.42, -2.92, 1.46);
+  const plate = new T.Mesh(new T.BoxGeometry(1.72, 0.26, 0.02), new T.MeshStandardMaterial({
     map: nameplateTexture(), metalness: 0.35, roughness: 0.45, color: 0xfff1c4
   }));
   plate.name = 'hkjc-nameplate';
-  plate.position.set(0.02, -2.46, 0.99);
+  plate.position.set(0.02, -3.08, 1.48);
   frame.add(plate);
   for (const [x, z] of [[-1.95, 0.62], [1.15, 0.62], [-1.95, -0.15], [1.15, -0.15]]) {
-    addBox(frame, 'foot-stem', 0.09, 0.16, 0.09, darkGold, x, -2.80, z);
+    addBox(frame, 'foot-stem', 0.09, 0.22, 0.09, darkGold, x, -3.38, z);
     const foot = new T.Mesh(new T.CylinderGeometry(0.13, 0.15, 0.07, 28), gold);
     foot.name = 'round-foot';
-    foot.position.set(x, -2.90, z);
+    foot.position.set(x, -3.50, z);
     frame.add(foot);
   }
 
   // Side standards holding the drum ring.
   for (const x of [-1.62, 1.62]) {
-    addBeam(frame, 'side-standard', [x, -2.02, 0.05], [x, 0.95, 0.05], 0.055, darkGold);
-    addBeam(frame, 'side-standard-front', [x * 0.98, -2.02, 0.55], [x * 0.92, -0.20, 0.55], 0.04, gold);
+    addBeam(frame, 'side-standard', [x, -2.90, 0.05], [x, 0.95, 0.05], 0.055, darkGold);
+    addBeam(frame, 'side-standard-front', [x * 0.98, -2.90, 0.55], [x * 0.92, -0.20, 0.55], 0.04, gold);
   }
   addBeam(frame, 'rear-crossbar', [-1.55, 0.95, -0.28], [1.55, 0.95, -0.28], 0.045, darkGold);
   addCylinderZ(frame, 'axle-cap-left', 0.09, 0.08, brightGold, -1.58, drumY, 0.52, 24);
@@ -277,8 +278,9 @@ export function buildMachine(_THREE, root, materials) {
   // slope is long (six balls); the right slope is short (the special ball).
   const tray = new T.Group();
   tray.name = 'receiving-tray';
-  // Below the drum and forward of it, with a clear gap. Local x=0 is the floor peak.
-  tray.position.set(0, -2.10, 1.18);
+  // Catch floor sits well below the drum exit. The trough body stays in front;
+  // the T-stem reaches back under the chute. Local x=0 is the flat centre.
+  tray.position.set(0, -2.82, 1.48);
   frame.add(tray);
 
   const woodWall = makeWoodMaterial(true);
@@ -305,7 +307,9 @@ export function buildMachine(_THREE, root, materials) {
   const rightInner = flatHalf + rightRun;
   const rightOuter = rightInner + wallT;
   const rightEndY = peakY - slope * rightRun;
-  const tunnelRear = -0.62;
+  // Rear of the T-stem, in tray space. World z lands just behind the chute mouth
+  // so the ball drops onto the track and rolls forward into the trough.
+  const tunnelRear = 0.10 - tray.position.z;
   const channelZ = 0;
   const zBack = zIn0 - wallT / 2;
   const zFront = zIn1 + wallT / 2;
@@ -421,25 +425,34 @@ export function buildMachine(_THREE, root, materials) {
     tray.add(mesh);
     return mesh;
   }
-  // Floor top, one surface. Centre flat continues back as the tunnel floor.
+  // Floor top of the visible trough. The centre flat continues back as a thin track,
+  // not a deep block, so the stem can pass under the drum without filling it.
   const floorVerts = [
     V(leftInner, endY, zF), V(-flatHalf, peakY, zF), V(flatHalf, peakY, zF), V(rightInner, rightEndY, zF),
-    V(leftInner, endY, zB), V(-flatHalf, peakY, zB), V(flatHalf, peakY, zB), V(rightInner, rightEndY, zB),
-    V(-flatHalf, peakY, zT), V(flatHalf, peakY, zT)
+    V(leftInner, endY, zB), V(-flatHalf, peakY, zB), V(flatHalf, peakY, zB), V(rightInner, rightEndY, zB)
   ];
   addSolidFromTop('trough-body', floorVerts, [
     [0, 1, 5, 4],
     [1, 2, 6, 5],
-    [2, 3, 7, 6],
-    [5, 6, 9, 8]
+    [2, 3, 7, 6]
   ], woodFloor);
-  // Close the vertical sides of that body so the wood is one shell.
-  const perimeter = [0, 1, 2, 3, 7, 6, 9, 8, 5, 4];
+  const perimeter = [0, 1, 2, 3, 7, 6, 5, 4];
   const skirtBottom = perimeter.map(i => V(floorVerts[i].x, 0, floorVerts[i].z));
   const skirtTop = perimeter.map(i => floorVerts[i].clone());
   skirtBottom.push(skirtBottom[0].clone());
   skirtTop.push(skirtTop[0].clone());
   addRibbon('trough-skirt', skirtBottom, skirtTop, woodWall);
+
+  const slab = 0.06;
+  const tunnelTop = [
+    V(-flatHalf, peakY, zB), V(flatHalf, peakY, zB), V(flatHalf, peakY, zT), V(-flatHalf, peakY, zT)
+  ];
+  const tunnelBot = tunnelTop.map(p => V(p.x, p.y - slab, p.z));
+  addRibbon('tunnel-floor', tunnelBot, tunnelTop, woodFloor);
+  addRibbon('tunnel-floor-underside', [...tunnelTop].reverse().map(p => p.clone()), [...tunnelBot].reverse().map(p => p.clone()), woodFloor);
+  addRibbon('tunnel-slab-left', [tunnelBot[3], tunnelBot[0]], [tunnelTop[3], tunnelTop[0]], woodWall);
+  addRibbon('tunnel-slab-right', [tunnelBot[1], tunnelBot[2]], [tunnelTop[1], tunnelTop[2]], woodWall);
+  addBox(tray, 'tunnel-rear-lip', flatHalf * 2, 0.11, 0.04, woodWall, 0, peakY + 0.055, zT);
 
   // Front glass: one ribbon. Bottom sits on the floor's front edge; top stays a constant height above it.
   const glassBottom = profile.map(p => V(p.x, p.y, zF));
@@ -521,8 +534,10 @@ export function buildMachine(_THREE, root, materials) {
   function rollPath(index) { return pathBetween(0, mainRestX[index]); }
   const specialRoll = pathBetween(0, specialX);
 
-  const chuteEndLocal = new T.Vector3(0, peakY + 0.02, tunnelRear + 0.06);
-  const chuteEnd = toWorld(chuteEndLocal);
+  // Ball centre: straight down from the chute mouth onto the long track, then forward.
+  const landZ = tubeExit.z - tray.position.z;
+  const landLocal = new T.Vector3(0, peakY + 0.02 + BALL_R, landZ);
+  const chuteEnd = toWorld(landLocal);
   const peakRest = toWorld(pointOnFloor(0));
   const dropPath = [
     selectorMouth.clone(),
