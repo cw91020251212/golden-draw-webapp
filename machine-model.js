@@ -307,9 +307,9 @@ export function buildMachine(_THREE, root, materials) {
   const rightInner = flatHalf + rightRun;
   const rightOuter = rightInner + wallT;
   const rightEndY = peakY - slope * rightRun;
-  // Rear of the T-stem, in tray space. World z lands just behind the chute mouth
-  // so the ball drops onto the track and rolls forward into the trough.
-  const tunnelRear = 0.10 - tray.position.z;
+  // Inner face of the rear stop, in tray space. World z is the drum axis,
+  // so the stem runs under the sphere to the bottom-centre exit.
+  const tunnelRear = -0.06 - tray.position.z;
   const channelZ = 0;
   const zBack = zIn0 - wallT / 2;
   const zFront = zIn1 + wallT / 2;
@@ -443,16 +443,18 @@ export function buildMachine(_THREE, root, materials) {
   skirtTop.push(skirtTop[0].clone());
   addRibbon('trough-skirt', skirtBottom, skirtTop, woodWall);
 
-  const slab = 0.06;
-  const tunnelTop = [
-    V(-flatHalf, peakY, zB), V(flatHalf, peakY, zB), V(flatHalf, peakY, zT), V(-flatHalf, peakY, zT)
-  ];
-  const tunnelBot = tunnelTop.map(p => V(p.x, p.y - slab, p.z));
-  addRibbon('tunnel-floor', tunnelBot, tunnelTop, woodFloor);
-  addRibbon('tunnel-floor-underside', [...tunnelTop].reverse().map(p => p.clone()), [...tunnelBot].reverse().map(p => p.clone()), woodFloor);
-  addRibbon('tunnel-slab-left', [tunnelBot[3], tunnelBot[0]], [tunnelTop[3], tunnelTop[0]], woodWall);
-  addRibbon('tunnel-slab-right', [tunnelBot[1], tunnelBot[2]], [tunnelTop[1], tunnelTop[2]], woodWall);
-  addBox(tray, 'tunnel-rear-lip', flatHalf * 2, 0.11, 0.04, woodWall, 0, peakY + 0.055, zT);
+  // Solid plank. Top face is the same flat plane as the centre landing.
+  const slab = 0.09;
+  const stemLen = zB - zT;
+  const tunnelFloor = new T.Mesh(new T.BoxGeometry(flatHalf * 2, slab, stemLen), woodFloor);
+  tunnelFloor.name = 'tunnel-floor';
+  tunnelFloor.position.set(0, peakY - slab / 2, (zB + zT) / 2);
+  tunnelFloor.castShadow = true;
+  tunnelFloor.receiveShadow = true;
+  tray.add(tunnelFloor);
+  // Transverse end board. Closes the far end so a ball cannot roll out the back.
+  addBox(tray, 'tunnel-end-stop', flatHalf * 2 + 0.16, backLift + slab, wallT, woodWall,
+    0, peakY + (backLift - slab) / 2, zT - wallT / 2);
 
   // Front glass: one ribbon. Bottom sits on the floor's front edge; top stays a constant height above it.
   const glassBottom = profile.map(p => V(p.x, p.y, zF));
