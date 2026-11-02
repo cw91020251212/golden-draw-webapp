@@ -53,10 +53,10 @@ function addFlatBar(parent, name, a, b, width, thickness, material) {
   parent.add(mesh);
   return mesh;
 }
-function addRing(parent, name, radius, tube, z, material, segments = 96) {
+function addRing(parent, name, radius, tube, z, material, segments = 96, y = 0) {
   const mesh = new THREE_DEFAULT.Mesh(new THREE_DEFAULT.TorusGeometry(radius, tube, 16, segments), material);
   mesh.name = name;
-  mesh.position.set(0, 0, z);
+  mesh.position.set(0, y, z);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   parent.add(mesh);
@@ -248,7 +248,8 @@ export function buildMachine(_THREE, root, materials) {
   drumWall.position.set(0, drumY, 0);
   frame.add(drumWall);
   const glassZ = drumDepth / 2 - 0.012;
-  const frontGlass = new T.Mesh(new T.CircleGeometry(drumRadius - 0.18, 96), glass);
+  const glassRadius = drumRadius - 0.155;
+  const frontGlass = new T.Mesh(new T.CircleGeometry(glassRadius, 96), glass);
   frontGlass.name = 'drum-front-glass';
   frontGlass.position.set(0, drumY, glassZ);
   frame.add(frontGlass);
@@ -257,18 +258,19 @@ export function buildMachine(_THREE, root, materials) {
   backGlass.position.set(0, drumY, -drumDepth / 2 + 0.02);
   backGlass.rotation.y = Math.PI;
   frame.add(backGlass);
-  addRing(frame, 'rear-rim', drumRadius, 0.05, -drumDepth / 2, darkGold);
-  addRing(frame, 'front-rim', drumRadius, 0.078, drumDepth / 2, brightGold);
-  addRing(frame, 'front-rim-inner', drumRadius - 0.13, 0.022, drumDepth / 2 + 0.008, gold);
-  // Domed covers sit on the front glass, just inside the bezel, over the screw heads.
-  const screwRadius = drumRadius - 0.30;
-  for (let i = 0; i < 16; i++) {
-    const a = -Math.PI / 2 + i * Math.PI * 2 / 16;
-    const cap = new T.Mesh(new T.SphereGeometry(0.042, 16, 12), brightGold);
-    cap.scale.z = 0.48;
+  addRing(frame, 'rear-rim', drumRadius, 0.05, -drumDepth / 2, darkGold, 96, drumY);
+  addRing(frame, 'front-rim', drumRadius, 0.078, drumDepth / 2, brightGold, 96, drumY);
+  addRing(frame, 'front-rim-inner', drumRadius - 0.13, 0.022, drumDepth / 2 + 0.008, gold, 96, drumY);
+  // Covers are children of the glass, in the glass plane, just inside the bezel.
+  const screwRadius = glassRadius - 0.055;
+  const screwCount = 18;
+  for (let i = 0; i < screwCount; i++) {
+    const a = -Math.PI / 2 + i * Math.PI * 2 / screwCount;
+    const cap = new T.Mesh(new T.SphereGeometry(0.032, 16, 10), brightGold);
+    cap.scale.z = 0.4;
     cap.name = 'glass-screw-cover';
-    cap.position.set(Math.cos(a) * screwRadius, Math.sin(a) * screwRadius + drumY, glassZ + 0.014);
-    frame.add(cap);
+    cap.position.set(Math.cos(a) * screwRadius, Math.sin(a) * screwRadius, 0.032 * 0.4);
+    frontGlass.add(cap);
   }
 
   // Six flat spokes on a gold hub. The hub turns; the drum shell stays fixed.
