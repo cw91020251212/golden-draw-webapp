@@ -352,51 +352,109 @@ export function buildMachine(_THREE, root, materials) {
     return mesh;
   }
 
-  // Left ramp, flat centre, right ramp. The ramps meet the flat; they do not meet each other.
-  addTopWall(tray, 'floor-left-wing', leftInner, endY, -flatHalf, peakY, 0, innerW, woodFloor);
-  addTopWall(tray, 'floor-right-wing', flatHalf, peakY, rightInner, endY, 0, innerW, woodFloor);
-  // One continuous flat: the centre landing, carried rearward as the T-slot floor.
-  addBox(tray, 'flat-centre-and-tunnel', flatHalf * 2, peakY, (zIn1 - tunnelRear), woodFloor,
-    0, peakY / 2, (tunnelRear + zIn1) / 2);
-  for (const side of [-1, 1]) {
-    const rail = addBox(tray, side < 0 ? 'tunnel-rail-left' : 'tunnel-rail-right',
-      0.04, 0.14, zBack - tunnelRear, woodWall,
-      side * (flatHalf - 0.02), peakY + 0.07, (tunnelRear + zBack) / 2);
-    rail.castShadow = true;
+  // One profile: left slope, flat centre, right slope. Every board uses these points.
+  const zF = innerW / 2;
+  const zB = -innerW / 2;
+  const zT = tunnelRear;
+  const backLift = 0.28;
+  const glassH = 0.16;
+  const glassLean = 0.055;
+  woodWall.side = T.DoubleSide;
+  woodFloor.side = T.DoubleSide;
+  trayGlass.side = T.DoubleSide;
+  const V = (x, y, z) => new T.Vector3(x, y, z);
+  const profile = [
+    V(leftInner, endY, 0),
+    V(-flatHalf, peakY, 0),
+    V(flatHalf, peakY, 0),
+    V(rightInner, endY, 0)
+  ];
+  function addRibbon(name, bottom, top, material) {
+    const positions = [];
+    const indices = [];
+    for (let i = 0; i < bottom.length; i++) {
+      positions.push(bottom[i].x, bottom[i].y, bottom[i].z, top[i].x, top[i].y, top[i].z);
+    }
+    for (let i = 0; i < bottom.length - 1; i++) {
+      const a = i * 2;
+      indices.push(a, a + 2, a + 3, a, a + 3, a + 1);
+    }
+    const geo = new T.BufferGeometry();
+    geo.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    const mesh = new T.Mesh(geo, material);
+    mesh.name = name;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    tray.add(mesh);
+    return mesh;
   }
-
-  // Back boards follow each wing, then stay level beside the flat centre.
-  const backLift = 0.30;
-  addTopWall(tray, 'back-board-left', leftOuter, endY + backLift, -flatHalf, peakY + backLift, zBack, wallT, woodWall);
-  addTopWall(tray, 'back-board-right', flatHalf, peakY + backLift, rightOuter, endY + backLift, zBack, wallT, woodWall);
-
-  addBox(tray, 'left-end-wall', wallT, endY + backLift, innerW + wallT * 2, woodWall,
-    leftOuter + wallT / 2, (endY + backLift) / 2, 0);
-  addBox(tray, 'right-end-wall', wallT, endY + backLift, innerW + wallT * 2, woodWall,
-    rightOuter - wallT / 2, (endY + backLift) / 2, 0);
-
-  // Front glass is a slanted slide on each wing. Its top edge follows the floor V.
-  function addSlopedGlass(name, x0, y0, x1, y1) {
-    const dx = x1 - x0, dy = y1 - y0;
-    const len = Math.hypot(dx, dy) || 0.001;
-    const angle = Math.atan2(dy, dx);
-    const group = new T.Group();
-    group.name = name;
-    group.position.set((x0 + x1) / 2, (y0 + y1) / 2, zFront - 0.01);
-    group.rotation.z = angle;
-    const pane = new T.Mesh(new T.BoxGeometry(len, glassSeat, 0.012), trayGlass);
-    pane.position.y = glassSeat / 2;
-    pane.rotation.x = -0.42;
-    pane.castShadow = false;
-    group.add(pane);
-    const lip = new T.Mesh(new T.BoxGeometry(len, 0.035, wallT), woodWall);
-    lip.position.set(0, 0.01, 0.02);
-    group.add(lip);
-    tray.add(group);
+  function addSolidFromTop(name, verts, quads, material) {
+    // verts: top surface. quads: arrays of 4 top-vertex indices. Skirt follows the first quad's outer loop? 
+    // Caller passes an explicit perimeter of top-vertex indices, in order.
+    const positions = [];
+    const indices = [];
+    const addV = (x, y, z) => { positions.push(x, y, z); return positions.length / 3 - 1; };
+    const topId = verts.map(v => addV(v.x, v.y, v.z));
+    const botId = verts.map(v => addV(v.x, 0, v.z));
+    const tri = (a, b, c) => indices.push(a, b, c);
+    for (const q of quads) {
+      const [a, b, c, d] = q.map(i => topId[i]);
+      tri(a, b, c); tri(a, c, d);
+      const [ba, bb, bc, bd] = q.map(i => botId[i]);
+      tri(ba, bc, bb); tri(ba, bd, bc);
+    }
+    const geo = new T.BufferGeometry();
+    geo.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    const mesh = new T.Mesh(geo, material);
+    mesh.name = name;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    tray.add(mesh);
+    return mesh;
   }
-  addSlopedGlass('glass-left', leftInner, endY + 0.04, -flatHalf, peakY + 0.04);
-  addSlopedGlass('glass-centre', -flatHalf, peakY + 0.04, flatHalf, peakY + 0.04);
-  addSlopedGlass('glass-right', flatHalf, peakY + 0.04, rightInner, endY + 0.04);
+  // Floor top, one surface. Centre flat continues back as the tunnel floor.
+  const floorVerts = [
+    V(leftInner, endY, zF), V(-flatHalf, peakY, zF), V(flatHalf, peakY, zF), V(rightInner, endY, zF),
+    V(leftInner, endY, zB), V(-flatHalf, peakY, zB), V(flatHalf, peakY, zB), V(rightInner, endY, zB),
+    V(-flatHalf, peakY, zT), V(flatHalf, peakY, zT)
+  ];
+  addSolidFromTop('trough-body', floorVerts, [
+    [0, 1, 5, 4],
+    [1, 2, 6, 5],
+    [2, 3, 7, 6],
+    [5, 6, 9, 8]
+  ], woodFloor);
+  // Close the vertical sides of that body so the wood is one shell.
+  const perimeter = [0, 1, 2, 3, 7, 6, 9, 8, 5, 4];
+  const skirtBottom = perimeter.map(i => V(floorVerts[i].x, 0, floorVerts[i].z));
+  const skirtTop = perimeter.map(i => floorVerts[i].clone());
+  skirtBottom.push(skirtBottom[0].clone());
+  skirtTop.push(skirtTop[0].clone());
+  addRibbon('trough-skirt', skirtBottom, skirtTop, woodWall);
+
+  // Front glass: one ribbon. Bottom sits on the floor's front edge; top stays a constant height above it.
+  const glassBottom = profile.map(p => V(p.x, p.y, zF));
+  const glassTop = profile.map(p => V(p.x, p.y + glassH, zF - glassLean));
+  const frontGlassRibbon = addRibbon('front-glass', glassBottom, glassTop, trayGlass);
+  frontGlassRibbon.castShadow = false;
+
+  // Back boards: one ribbon per side that turns the corner into the tunnel rail.
+  // Top edge is the floor profile plus a constant rise, including across the flat.
+  const leftBackBottom = [V(leftInner, endY, zB), V(-flatHalf, peakY, zB), V(-flatHalf, peakY, zT)];
+  const leftBackTop = leftBackBottom.map(p => V(p.x, p.y + backLift, p.z));
+  addRibbon('back-left', leftBackBottom, leftBackTop, woodWall);
+  const rightBackBottom = [V(rightInner, endY, zB), V(flatHalf, peakY, zB), V(flatHalf, peakY, zT)];
+  const rightBackTop = rightBackBottom.map(p => V(p.x, p.y + backLift, p.z));
+  addRibbon('back-right', rightBackBottom, rightBackTop, woodWall);
+
+  addBox(tray, 'left-end-wall', wallT, endY + backLift, zF - zB, woodWall,
+    leftOuter + wallT / 2, (endY + backLift) / 2, (zF + zB) / 2);
+  addBox(tray, 'right-end-wall', wallT, endY + backLift, zF - zB, woodWall,
+    rightOuter - wallT / 2, (endY + backLift) / 2, (zF + zB) / 2);
 
   // Empty group so the old gate call has nothing visible to raise across the peak.
   const retainer = new T.Group();
@@ -457,7 +515,7 @@ export function buildMachine(_THREE, root, materials) {
   function rollPath(index) { return pathBetween(0, mainRestX[index]); }
   const specialRoll = pathBetween(0, specialX);
 
-  const chuteEndLocal = new T.Vector3(0, peakY + 0.02, tunnelRear + 0.08);
+  const chuteEndLocal = new T.Vector3(0, peakY + 0.02, tunnelRear + 0.06);
   const chuteEnd = toWorld(chuteEndLocal);
   const peakRest = toWorld(pointOnFloor(0));
   const dropPath = [
