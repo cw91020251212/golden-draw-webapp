@@ -447,11 +447,18 @@ export function buildMachine(_THREE, root, materials) {
     return mesh;
   }
   function addSolidFromTop(name, verts, quads, material) {
-    // verts: top surface. quads: arrays of 4 top-vertex indices. Skirt follows the first quad's outer loop? 
-    // Caller passes an explicit perimeter of top-vertex indices, in order.
+    // verts: top surface. quads: arrays of 4 top-vertex indices.
     const positions = [];
+    const uvs = [];
     const indices = [];
-    const addV = (x, y, z) => { positions.push(x, y, z); return positions.length / 3 - 1; };
+    const spanX = Math.max(0.001, rightInner - leftInner);
+    const spanZ = Math.max(0.001, zF - zB);
+    const addV = (x, y, z) => {
+      positions.push(x, y, z);
+      // Same 0–1 face mapping BoxGeometry uses, so the oak tile matches the pedestal.
+      uvs.push((x - leftInner) / spanX, (z - zB) / spanZ);
+      return positions.length / 3 - 1;
+    };
     const topId = verts.map(v => addV(v.x, v.y, v.z));
     const botId = verts.map(v => addV(v.x, 0, v.z));
     const tri = (a, b, c) => indices.push(a, b, c);
@@ -463,6 +470,7 @@ export function buildMachine(_THREE, root, materials) {
     }
     const geo = new T.BufferGeometry();
     geo.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2));
     geo.setIndex(indices);
     geo.computeVertexNormals();
     const mesh = new T.Mesh(geo, material);
@@ -492,8 +500,8 @@ export function buildMachine(_THREE, root, materials) {
   function addTimber(name, a0, a1, a2, a3, b0, b1, b2, b3) {
     const verts = [a0, a1, a2, a3, b0, b1, b2, b3];
     const positions = [];
+    const uvs = [];
     const indices = [];
-    verts.forEach(v => positions.push(v.x, v.y, v.z));
     const quads = [
       [0, 1, 2, 3],
       [4, 7, 6, 5],
@@ -502,9 +510,33 @@ export function buildMachine(_THREE, root, materials) {
       [2, 6, 7, 3],
       [3, 7, 4, 0]
     ];
-    quads.forEach(([a, b, c, d]) => indices.push(a, b, c, a, c, d));
+    const uvOf = (origin, axisU, axisV, uLen, vLen, p) => {
+      const d = new T.Vector3().subVectors(p, origin);
+      return [d.dot(axisU) / uLen, d.dot(axisV) / vLen];
+    };
+    quads.forEach((quad, face) => {
+      const pts = quad.map(i => verts[i]);
+      const origin = pts[0];
+      const edgeA = new T.Vector3().subVectors(pts[1], origin);
+      const edgeB = new T.Vector3().subVectors(pts[3], origin);
+      const vertical = Math.abs(edgeA.y) >= Math.abs(edgeB.y);
+      const rawU = vertical ? edgeB : edgeA;
+      const rawV = vertical ? edgeA : edgeB;
+      const uLen = Math.max(0.001, rawU.length());
+      const vLen = Math.max(0.001, rawV.length());
+      const axisU = rawU.clone().multiplyScalar(1 / uLen);
+      const axisV = rawV.clone().multiplyScalar(1 / vLen);
+      const base = face * 4;
+      pts.forEach(p => {
+        positions.push(p.x, p.y, p.z);
+        const [u, v] = uvOf(origin, axisU, axisV, uLen, vLen, p);
+        uvs.push(u, v);
+      });
+      indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    });
     const geo = new T.BufferGeometry();
     geo.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2));
     geo.setIndex(indices);
     geo.computeVertexNormals();
     const mesh = new T.Mesh(geo, woodWall);

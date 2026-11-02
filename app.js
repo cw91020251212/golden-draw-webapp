@@ -1,6 +1,6 @@
 import * as THREE from './three.module.js';
-import { buildMachine } from './machine-model.js?v=tray-no-ring-16';
-import {CompatibleRenderer} from './compat.js?v=tray-no-ring-16';
+import { buildMachine } from './machine-model.js?v=tray-grain-17';
+import {CompatibleRenderer} from './compat.js?v=tray-grain-17';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
 const $=id=>document.getElementById(id);
 const reds=new Set([1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46]);
