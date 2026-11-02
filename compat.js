@@ -64,13 +64,13 @@ export class CompatibleRenderer {
       line([x,-1.80,.48],[x*.78,-.68,.48],gold,Math.max(2,w*.003));
     }
 
-    // Seven-column transparent magazine with the numbered balls inside.
-    path([[-.84,1.70,.40],[.84,1.70,.40],[.84,4.24,.40],[-.84,4.24,.40]],gold,2,'#c5a35b22');
-    line([-.84,1.72,.40],[.84,1.72,.40],bright,2);
-    line([-.84,4.22,.40],[.84,4.22,.40],bright,2);
-    for (let col=0;col<7;col++) {
-      const x=(col-3)*.20;
-      line([x,1.78,.35],[x,4.17,.35],glass,Math.max(2,w*.002));
+    // Five-column transparent magazine with the numbered balls inside.
+    path([[-.74,1.78,.32],[.74,1.78,.32],[.74,4.18,.32],[-.74,4.18,.32]],gold,2,'#c5a35b22');
+    line([-.74,1.80,.32],[.74,1.80,.32],bright,2);
+    line([-.74,4.16,.32],[.74,4.16,.32],bright,2);
+    for (let col=0;col<5;col++) {
+      const x=(col-2)*.252;
+      line([x,1.86,.28],[x,4.08,.28],glass,Math.max(2,w*.002));
     }
 
     // The drum is a shallow circle with visible depth rings, not a sphere or flat disc.
@@ -85,42 +85,30 @@ export class CompatibleRenderer {
     // Central three-spoke rotor, clockwise position, and short visible selector tube.
     if (rotor) {
       const a0=rotor.rotation.z;
-      const center=[0,.05,.21];
-      for (let i=0;i<3;i++) {
-        const a=Math.PI/2+i*Math.PI*2/3+a0;
-        line(center,[Math.cos(a)*1.20,.05+Math.sin(a)*1.20,.21],bright,Math.max(2,w*.003));
-        const px=Math.cos(a)*.91,py=.05+Math.sin(a)*.91;
-        line([px-.11,py-.10,.25],[px+.11,py+.10,.25],gold,Math.max(3,w*.004));
+      const center=[0,.16,.12];
+      for (let i=0;i<6;i++) {
+        const a=-Math.PI/2+i*Math.PI/3+a0;
+        line(center,[Math.cos(a)*1.18,0.16+Math.sin(a)*1.18,.18],bright,Math.max(2,w*.003));
       }
       circle(.25,.05,.30,gold,2,'#bd9148');
     }
-    line([0,-1.23,.48],[0,-1.70,.48],glass,Math.max(4,w*.006));
-    line([-.14,-1.24,.50],[.14,-1.24,.50],bright,2);
-
-    // Asymmetric receiver: long left lane and a visibly shorter angled right pocket.
-    const drawLane = (group,color) => {
-      if (!group) return;
-      group.updateMatrixWorld(true);
-      const len=group.userData.slotLength, halfWidth=(group.userData.slotWidth||.56)/2, openAt=group.userData.openAt||'none';
-      const left=[],right=[];
-      for(let i=0;i<=32;i++){
-        const x=(i/32-.5)*len;
-        left.push(group.localToWorld(new THREE.Vector3(x,.10,-halfWidth)));
-        right.push(group.localToWorld(new THREE.Vector3(x,.10,halfWidth)));
-      }
-      path(left,color,Math.max(2,w*.003));path(right,color,Math.max(2,w*.003));
-      const cap=(x)=>[group.localToWorld(new THREE.Vector3(x,.10,-halfWidth)),group.localToWorld(new THREE.Vector3(x,.10,halfWidth))];
-      if(openAt!=='left'&&openAt!=='both')path(cap(-len/2),bright,1.5);
-      if(openAt!=='right'&&openAt!=='both')path(cap(len/2),bright,1.5);
-    };
-    drawLane(receiverEntryLane,'#d9b15b');
-    drawLane(mainResultSlot,bright);
-    drawLane(specialResultSlot,gold);
+    line([0,-1.12,.20],[0,-1.46,.24],glass,Math.max(4,w*.006));
+    line([-.12,-1.14,.22],[.12,-1.14,.22],bright,2);
+    if (state.machineModel?.chuteEnd) {
+      const end=state.machineModel.chuteEnd;
+      line([0,-1.46,.24],[end.x,end.y,end.z],glass,Math.max(3,w*.004));
+    }
+    const outline=state.machineModel?.trayOutline;
+    if (outline) {
+      path(outline.floor,bright,Math.max(2,w*.003));
+      path(outline.crest,gold,Math.max(2,w*.003));
+      path(outline.glass,'#d7f3f2',Math.max(1.5,w*.002),'#d7f3f233');
+    }
     if (diverterGatePivot) {
       diverterGatePivot.updateMatrixWorld(true);
-      const blade=diverterGatePivot.getObjectByName('simplified-diverter-blade');
-      if(blade){blade.updateMatrixWorld(true);const vertices=[[-.05,.03,-.21],[.05,.03,-.21],[.05,.03,.21],[-.05,.03,.21]]
-        .map(v=>blade.localToWorld(new THREE.Vector3(...v)));path(vertices,bright,2,'#dfba6970');}
+      const panel=diverterGatePivot.getObjectByName('retainer-panel');
+      if(panel){panel.updateMatrixWorld(true);const vertices=[[-.01,.13,-.14],[.01,.13,-.14],[.01,.13,.14],[-.01,.13,.14]]
+        .map(v=>panel.localToWorld(new THREE.Vector3(...v)));path(vertices,'#e7fbff',2,'#d7f4f088');}
     }
 
     const reds = new Set([1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46]);
