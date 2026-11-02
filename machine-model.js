@@ -272,15 +272,12 @@ export function buildMachine(_THREE, root, materials) {
   const selectorMouth = new T.Vector3(0, -1.04, 0.28);
   const tubeExit = new T.Vector3(0, -1.28, 0.34);
 
-  // Receiving tray, copied from the wood CAD: one solid birch block.
-  // The exterior bottom is flat. The front wall's top edge follows the floor
-  // (level, then up the slope). Glass sits in a groove under that top edge.
-  // The right end wall is an L: tall at the back, stepped down at the front,
-  // leaving the open notch the chute drops into.
+  // Hand-sketch tray: a rectangular wood block whose interior floor
+  // peaks under the centre chute and slopes down both ways. The left
+  // slope is long (six balls); the right slope is short (the special ball).
   const tray = new T.Group();
   tray.name = 'receiving-tray';
-  // Local x=0 is the drop, directly under the drum-centre chute.
-  tray.position.set(0, -2.04, 0.78);
+  tray.position.set(0, -2.04, 0.72);
   frame.add(tray);
 
   const woodWall = makeWoodMaterial(true);
@@ -290,26 +287,19 @@ export function buildMachine(_THREE, root, materials) {
   trayGlass.opacity = 0.42;
   trayGlass.color = new T.Color(0xd5e8ea);
 
-  const wallT = 0.11;
-  const innerW = 0.40;
+  const wallT = 0.10;
+  const innerW = 0.42;
   const zIn0 = -innerW / 2;
   const zIn1 = innerW / 2;
-  // Six ball-widths of flat lower run sit entirely LEFT of the drop.
-  // The raised pocket is about one ball wide, with only a short stub to the right.
-  const leftInner = -1.86;
+  const leftInner = -1.64;
   const leftOuter = leftInner - wallT;
-  const slopeStart = -0.52;
-  const slopeEnd = -0.12;
-  const rightInner = 0.18;
+  const rightInner = 0.48;
   const rightOuter = rightInner + wallT;
-  const floorLeft = 0.30;
-  const floorRight = 0.50;
-  const frontTopLeft = 0.52;
-  const frontTopSlopeEnd = 0.70;
-  const backTopLeft = 0.60;
-  const backTopRight = 0.96;
-  const frontTopRight = 0.74;
-  const endLowTop = 0.62;
+  const endY = 0.24;
+  const peakY = 0.58;
+  const frontTop = 0.78;
+  const backTop = 1.02;
+  const notchHalf = 0.18;
   const channelZ = 0;
   const zBack = zIn0 - wallT / 2;
   const zFront = zIn1 + wallT / 2;
@@ -361,107 +351,65 @@ export function buildMachine(_THREE, root, materials) {
     return mesh;
   }
 
-  // Solid lower body, then the raised right floor sitting on it.
-  addBox(tray, 'wood-plinth', rightOuter - leftOuter, floorLeft, innerW + wallT * 2, woodWall,
-    (leftOuter + rightOuter) / 2, floorLeft / 2, 0);
-  addBox(tray, 'wood-raised-floor', rightOuter - slopeEnd, floorRight - floorLeft, innerW + wallT * 2, woodFloor,
-    (slopeEnd + rightOuter) / 2, floorLeft + (floorRight - floorLeft) / 2, 0);
-  // Sloping tread. A thin board following the ramp, on top of the plinth.
-  {
-    const dx = slopeEnd - slopeStart;
-    const dy = floorRight - floorLeft;
-    const len = Math.hypot(dx, dy);
-    const angle = Math.atan2(dy, dx);
-    const tread = new T.Mesh(new T.BoxGeometry(len, 0.045, innerW), woodFloor);
-    tread.name = 'wood-slope-tread';
-    tread.position.set((slopeStart + slopeEnd) / 2, (floorLeft + floorRight) / 2, 0);
-    tread.rotation.z = angle;
-    tread.receiveShadow = true;
-    tray.add(tread);
-    // Fill the triangle under the tread so the slope is solid wood, not a floating ramp.
-    addTopWall(tray, 'wood-slope-fill', slopeStart, floorLeft, slopeEnd, floorRight, 0, innerW, woodWall);
-  }
-  // Flat floor skins so the grain runs along the channel.
-  addBox(tray, 'wood-floor-left', slopeStart - leftInner, 0.02, innerW, woodFloor,
-    (leftInner + slopeStart) / 2, floorLeft + 0.01, 0);
-  addBox(tray, 'wood-floor-right', rightInner - slopeEnd, 0.02, innerW, woodFloor,
-    (slopeEnd + rightInner) / 2, floorRight + 0.01, 0);
+  // Two solid wedges: high at x=0, falling to both ends. That is the pitched floor.
+  addTopWall(tray, 'floor-left-wing', leftInner, endY, 0, peakY, 0, innerW, woodFloor);
+  addTopWall(tray, 'floor-right-wing', 0, peakY, rightInner, endY, 0, innerW, woodFloor);
 
-  // Back wall: level on the left, then a vertical step up into the taller right bay.
-  addBox(tray, 'back-wall-left', slopeEnd - leftOuter, backTopLeft, wallT, woodWall,
-    (leftOuter + slopeEnd) / 2, backTopLeft / 2, zBack);
-  addBox(tray, 'back-wall-right', rightOuter - slopeEnd, backTopRight, wallT, woodWall,
-    (slopeEnd + rightOuter) / 2, backTopRight / 2, zBack);
-  // The step itself is the vertical wood face between the low run and the raised pocket.
-  addBox(tray, 'divider-step', wallT, backTopRight - backTopLeft, wallT, woodWall,
-    slopeEnd + wallT / 2, backTopLeft + (backTopRight - backTopLeft) / 2, zBack);
+  // Back wall is the taller side, with a centre notch the chute enters.
+  const notchSill = peakY + 0.12;
+  addBox(tray, 'back-wall-left', -notchHalf - leftOuter, backTop, wallT, woodWall,
+    (leftOuter + -notchHalf) / 2, backTop / 2, zBack);
+  addBox(tray, 'back-wall-right', rightOuter - notchHalf, backTop, wallT, woodWall,
+    (notchHalf + rightOuter) / 2, backTop / 2, zBack);
+  addBox(tray, 'back-notch-sill', notchHalf * 2, notchSill, wallT, woodWall,
+    0, notchSill / 2, zBack);
 
-  // Left end cap.
-  addBox(tray, 'left-end-wall', wallT, backTopLeft, innerW + wallT * 2, woodWall,
-    leftOuter + wallT / 2, backTopLeft / 2, 0);
+  addBox(tray, 'left-end-wall', wallT, backTop, innerW + wallT * 2, woodWall,
+    leftOuter + wallT / 2, backTop / 2, 0);
+  addBox(tray, 'right-end-wall', wallT, backTop, innerW + wallT * 2, woodWall,
+    rightOuter - wallT / 2, backTop / 2, 0);
 
-  // Front wall is a real opening, not a solid board with glass stuck on it.
-  // Sill up to the floor line, glass recessed in the groove, wood cap above.
-  const sillTop = floorLeft + 0.045;
-  const slopeSillTop = floorRight + 0.045;
-  addBox(tray, 'front-sill-flat', slopeStart - leftOuter, sillTop, wallT, woodWall,
-    (leftOuter + slopeStart) / 2, sillTop / 2, zFront);
-  addTopWall(tray, 'front-sill-slope', slopeStart, sillTop, slopeEnd, slopeSillTop, zFront, wallT, woodWall);
-  addBox(tray, 'front-wall-right', rightInner - slopeEnd, frontTopRight, wallT, woodWall,
-    (slopeEnd + rightInner) / 2, frontTopRight / 2, zFront);
-  // Vertical wood face where the low front wall meets the taller right pocket.
-  addBox(tray, 'front-divider-face', wallT * 0.8, frontTopRight - frontTopLeft, wallT, woodWall,
-    slopeEnd, frontTopLeft + (frontTopRight - frontTopLeft) / 2, zFront);
+  // Vertical front baffle: wood sill and cap, clear glass in between.
+  const sillTop = endY - 0.02;
+  addBox(tray, 'front-sill', rightOuter - leftOuter, sillTop, wallT, woodWall,
+    (leftOuter + rightOuter) / 2, sillTop / 2, zFront);
+  addBox(tray, 'front-cap', rightOuter - leftOuter, capH, wallT, woodWall,
+    (leftOuter + rightOuter) / 2, frontTop - capH / 2, zFront);
+  const glassZ = zFront - 0.02;
+  const glassH = frontTop - capH - sillTop;
+  const trayFrontGlass = addBox(tray, 'front-glass', rightInner - leftInner, glassH, 0.012, trayGlass,
+    (leftInner + rightInner) / 2, sillTop + glassH / 2, glassZ);
+  trayFrontGlass.castShadow = false;
+  addBox(tray, 'front-groove', rightInner - leftInner, 0.016, 0.02, woodGroove,
+    (leftInner + rightInner) / 2, sillTop + 0.004, zFront + 0.015);
 
-  const glassZ = zFront - 0.018;
-  const grooveZ = zFront + 0.02;
-  addStrip(tray, 'glass-flat', leftInner + 0.02, sillTop, slopeStart, sillTop, glassZ, glassSeat, 0.014, trayGlass);
-  addStrip(tray, 'glass-slope', slopeStart, sillTop, slopeEnd, slopeSillTop, glassZ, glassSeat, 0.014, trayGlass);
-  addStrip(tray, 'glass-groove-flat', leftInner + 0.02, sillTop - 0.004, slopeStart, sillTop - 0.004, grooveZ, 0.014, 0.02, woodGroove);
-  addStrip(tray, 'glass-groove-slope', slopeStart, sillTop - 0.004, slopeEnd, slopeSillTop - 0.004, grooveZ, 0.014, 0.02, woodGroove);
-  addStrip(tray, 'front-cap-flat', leftOuter, frontTopLeft - capH, slopeStart, frontTopLeft - capH, zFront, capH, wallT, woodWall);
-  addStrip(tray, 'front-cap-slope', slopeStart, frontTopLeft - capH, slopeEnd, frontTopSlopeEnd - capH, zFront, capH, wallT, woodWall);
-
-  // Right end wall, L-shaped: tall against the back wall, stepped down toward the front.
-  const zStep = -0.02;
-  addBox(tray, 'end-wall-tall', wallT, backTopRight, (zStep - zIn0) + wallT, woodWall,
-    rightOuter - wallT / 2, backTopRight / 2, (zBack + zStep) / 2);
-  addBox(tray, 'end-wall-low', wallT, endLowTop, (zIn1 - zStep) + wallT, woodWall,
-    rightOuter - wallT / 2, endLowTop / 2, (zStep + zFront) / 2);
-
-  // Wood retainer. Down inside the platform while the six roll left; raised as
-  // the vertical divider that keeps the special ball on the high pocket.
+  // Empty group so the old gate call has nothing visible to raise across the peak.
   const retainer = new T.Group();
   retainer.name = 'special-ball-retainer';
-  retainer.position.set(slopeEnd, floorRight, channelZ);
-  retainer.userData.baseY = floorRight;
-  retainer.userData.travel = 0.30;
+  retainer.position.set(0, peakY, 0);
+  retainer.userData.baseY = peakY;
+  retainer.userData.travel = 0;
   tray.add(retainer);
-  const retainerPanel = new T.Mesh(new T.BoxGeometry(0.045, 0.30, innerW * 0.96), woodWall);
-  retainerPanel.name = 'retainer-panel';
-  retainerPanel.position.set(0, 0.15 - 0.30, 0);
-  retainer.add(retainerPanel);
 
-  const rightY = floorRight;
   const samples = [
-    { x: leftInner, y: floorLeft },
-    { x: slopeStart, y: floorLeft },
-    { x: slopeEnd, y: floorRight },
-    { x: rightInner, y: floorRight }
+    { x: leftInner, y: endY },
+    { x: 0, y: peakY },
+    { x: rightInner, y: endY }
   ];
 
   function floorTopY(x) {
-    let y = floorRight;
-    if (x <= slopeStart) y = floorLeft;
-    else if (x < slopeEnd) {
-      const u = (x - slopeStart) / (slopeEnd - slopeStart);
-      y = floorLeft + (floorRight - floorLeft) * u;
+    const clamped = Math.max(leftInner, Math.min(rightInner, x));
+    if (clamped <= 0) {
+      const u = (clamped - leftInner) / (0 - leftInner);
+      return endY + (peakY - endY) * u + 0.02;
     }
-    return y + 0.03;
+    const u = clamped / rightInner;
+    return peakY + (endY - peakY) * u + 0.02;
   }
   function floorAngle(x) {
-    if (x <= slopeStart || x >= slopeEnd) return 0;
-    return Math.atan2(floorRight - floorLeft, slopeEnd - slopeStart);
+    if (x < 0) return Math.atan2(peakY - endY, -leftInner);
+    if (x > 0) return Math.atan2(endY - peakY, rightInner);
+    return 0;
   }
   function pointOnFloor(x) {
     const y = floorTopY(x);
@@ -470,28 +418,27 @@ export function buildMachine(_THREE, root, materials) {
   }
 
   const mainRestX = [];
-  for (let i = 0; i < 6; i++) mainRestX.push(leftInner + 0.04 + BALL_R + i * (BALL_D + 0.014));
-  const specialX = 0.02;
+  for (let i = 0; i < 6; i++) mainRestX.push(leftInner + 0.06 + BALL_R + i * 0.23);
+  const specialX = rightInner - 0.06 - BALL_R;
 
   frame.updateMatrixWorld(true);
   const toWorld = v => tray.localToWorld(v.clone());
   const mainRests = mainRestX.map(x => toWorld(pointOnFloor(x)));
   const specialRest = toWorld(pointOnFloor(specialX));
 
-  function rollPath(index) {
+  function pathBetween(startX, endX) {
     const pts = [];
-    const startX = specialX;
-    const endX = mainRestX[index];
-    const steps = 28;
+    const steps = 24;
     for (let i = 0; i <= steps; i++) {
       const u = i / steps;
-      const x = startX + (endX - startX) * u;
-      pts.push(toWorld(pointOnFloor(x)));
+      pts.push(toWorld(pointOnFloor(startX + (endX - startX) * u)));
     }
     return pts;
   }
+  function rollPath(index) { return pathBetween(0, mainRestX[index]); }
+  const specialRoll = pathBetween(0, specialX);
 
-  const chuteEndLocal = new T.Vector3(0, endLowTop + 0.06, 0.04);
+  const chuteEndLocal = new T.Vector3(0, peakY + 0.28, -innerW * 0.15);
   const chuteEnd = toWorld(chuteEndLocal);
   // Clear chute from the centre tube down into the notched right-hand entry.
   const chuteDir = new T.Vector3().subVectors(chuteEnd, tubeExit);
@@ -509,28 +456,29 @@ export function buildMachine(_THREE, root, materials) {
     [tubeExit.x + 0.10, tubeExit.y, tubeExit.z],
     [chuteEnd.x + 0.10, chuteEnd.y, chuteEnd.z], 0.012, brightGold);
 
+  const peakRest = toWorld(pointOnFloor(0));
   const dropPath = [
     selectorMouth.clone(),
     tubeExit.clone(),
     chuteEnd.clone(),
-    specialRest.clone()
+    peakRest.clone()
   ];
 
-  const trayFocus = toWorld(new T.Vector3((leftInner + rightInner) / 2, 0.42, 0));
+  const trayFocus = toWorld(new T.Vector3((leftInner + rightInner) / 2, peakY * 0.55, 0));
   const outlinePoint = (x, y, z) => toWorld(new T.Vector3(x, y, z));
   const trayOutline = {
     floor: samples.map(s => outlinePoint(s.x, s.y, zFront)),
     crest: [
-      outlinePoint(leftOuter, frontTopLeft, zFront),
-      outlinePoint(slopeStart, frontTopLeft, zFront),
-      outlinePoint(slopeEnd, frontTopSlopeEnd, zFront),
-      outlinePoint(rightOuter, backTopRight, zFront)
+      outlinePoint(leftOuter, frontTop, zFront),
+      outlinePoint(rightOuter, frontTop, zFront),
+      outlinePoint(rightOuter, backTop, zBack),
+      outlinePoint(leftOuter, backTop, zBack)
     ],
     glass: [
-      outlinePoint(leftInner, floorLeft + 0.04, zFront),
-      outlinePoint(slopeEnd, floorRight + 0.04, zFront),
-      outlinePoint(slopeEnd, frontTopSlopeEnd - 0.02, zFront),
-      outlinePoint(leftInner, frontTopLeft - 0.02, zFront)
+      outlinePoint(leftInner, sillTop, zFront),
+      outlinePoint(rightInner, sillTop, zFront),
+      outlinePoint(rightInner, frontTop - capH, zFront),
+      outlinePoint(leftInner, frontTop - capH, zFront)
     ]
   };
 
@@ -540,15 +488,15 @@ export function buildMachine(_THREE, root, materials) {
   tray.userData.openAt = 'none';
   const mainLane = new T.Group();
   mainLane.name = 'left-run';
-  mainLane.position.set((leftInner + slopeStart) / 2, floorLeft, 0);
-  mainLane.userData.slotLength = slopeStart - leftInner;
+  mainLane.position.set(leftInner / 2, endY, 0);
+  mainLane.userData.slotLength = -leftInner;
   mainLane.userData.slotWidth = innerW;
   mainLane.userData.openAt = 'right';
   tray.add(mainLane);
   const specialLane = new T.Group();
   specialLane.name = 'right-pocket';
-  specialLane.position.set((slopeEnd + rightInner) / 2, floorRight, 0);
-  specialLane.userData.slotLength = rightInner - slopeEnd;
+  specialLane.position.set(rightInner / 2, endY, 0);
+  specialLane.userData.slotLength = rightInner;
   specialLane.userData.slotWidth = innerW;
   specialLane.userData.openAt = 'left';
   tray.add(specialLane);
@@ -564,7 +512,7 @@ export function buildMachine(_THREE, root, materials) {
     specialResultSlot: specialLane,
     diverterGatePivot: retainer,
     drumRadius, drumDepth, drumHalfDepth: drumDepth / 2,
-    rackPosition, mainRests, specialRest, rollPath, dropPath, trayFocus, trayOutline,
+    rackPosition, mainRests, specialRest, rollPath, specialRoll, dropPath, trayFocus, trayOutline,
     spokeCount: 6
   };
 }
