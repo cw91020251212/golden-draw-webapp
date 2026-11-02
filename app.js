@@ -1,6 +1,6 @@
 import * as THREE from './three.module.js';
-import { buildMachine, BALL_R } from './machine-model.js?v=camera-screws-19';
-import {CompatibleRenderer} from './compat.js?v=camera-screws-19';
+import { buildMachine, BALL_R } from './machine-model.js?v=front-wide-20';
+import {CompatibleRenderer} from './compat.js?v=front-wide-20';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
 const $=id=>document.getElementById(id);
 const reds=new Set([1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46]);
@@ -44,7 +44,7 @@ function motorSpeed(){return -3.45;}
 
 function envTexture(){const c=document.createElement('canvas');c.width=1024;c.height=512;const g=c.getContext('2d');g.fillStyle='#6f8290';g.fillRect(0,0,1024,512);const grad=g.createLinearGradient(0,0,0,512);grad.addColorStop(0,'#ffffff');grad.addColorStop(.35,'#b6c4c8');grad.addColorStop(.55,'#2e4757');grad.addColorStop(1,'#a6a398');g.fillStyle=grad;g.fillRect(0,0,1024,512);g.fillStyle='#ffeed1';g.fillRect(90,30,140,220);g.fillStyle='#ffffff';g.fillRect(590,70,70,290);g.fillStyle='#e5edec';g.fillRect(830,90,130,120);const t=new THREE.CanvasTexture(c);t.mapping=THREE.EquirectangularReflectionMapping;t.colorSpace=THREE.SRGBColorSpace;return t;}
 function ballTexture(n){const c=document.createElement('canvas');c.width=256;c.height=128;const g=c.getContext('2d');g.fillStyle=({red:'#cf292f',blue:'#226596',green:'#23834e'})[colorOf(n)];g.fillRect(0,0,256,128);for(let row=0;row<2;row++)for(let col=0;col<4;col++){const x=32+col*64,y=32+row*64;g.fillStyle='#fff4d1';g.beginPath();g.ellipse(x,y,23,21,0,0,Math.PI*2);g.fill();g.fillStyle='#3b3021';g.font='bold 24px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText(n,x,y+1);}const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;t.userData={number:n,color:colorOf(n)};return t;}
-function init(){scene=new THREE.Scene();scene.environment=envTexture();camera=new THREE.PerspectiveCamera(37,1,.1,70);camera.position.set(2.4,1.7,13.2);cameraTarget.set(0,0.7,0.1);try{renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'high-performance'});}catch{renderer=new CompatibleRenderer(()=>({balls,rotor,cupBallRecords,machineModel,receiverEntryLane,mainResultSlot,specialResultSlot,diverterGatePivot}));$('scene').dataset.renderer='compatible';}renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setClearColor(0x000000,0);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;$('scene').appendChild(renderer.domElement);$('loading').remove();
+function init(){scene=new THREE.Scene();scene.environment=envTexture();camera=new THREE.PerspectiveCamera(37,1,.1,70);camera.position.set(0,1.45,13.2);cameraTarget.set(0,0.65,0.15);try{renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'high-performance'});}catch{renderer=new CompatibleRenderer(()=>({balls,rotor,cupBallRecords,machineModel,receiverEntryLane,mainResultSlot,specialResultSlot,diverterGatePivot}));$('scene').dataset.renderer='compatible';}renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setClearColor(0x000000,0);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;$('scene').appendChild(renderer.domElement);$('loading').remove();
 scene.add(new THREE.HemisphereLight(0xdcecf5,0x72664c,2.3));const key=new THREE.DirectionalLight(0xffe6b7,4.3);key.position.set(-4,7,5);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-5;key.shadow.camera.right=5;key.shadow.camera.top=7;key.shadow.camera.bottom=-4;key.shadow.bias=-.001;scene.add(key);const rim=new THREE.DirectionalLight(0xcceeff,3);rim.position.set(3,3,-4);scene.add(rim);const front=new THREE.PointLight(0xffd08a,16,12);front.position.set(2,2,4);scene.add(front);
 root=new THREE.Group();scene.add(root);
 const gold=new THREE.MeshStandardMaterial({color:0xc79a45,metalness:.88,roughness:.23});
@@ -338,7 +338,7 @@ function updateCamera(dt){
  }else if(mode==='orbit'){
   desired.set(Math.sin(realTime*.14)*5,2.45,Math.cos(realTime*.14)*3+10.2*fit);target.set(0,.90,0);
  }else{
-  desired.set(2.6+mouseX*.25,2.65,14.3*fit);target.set(0,.85,0);
+  desired.set(0,1.45,14.3*fit);target.set(0,0.65,0.15);
  }
  if(!resultShot&&(mode==='wide'||mode==='close'))fitNarrowRunningCamera(mode,desired,target);
  if(mode==='results'&&resultShot){
