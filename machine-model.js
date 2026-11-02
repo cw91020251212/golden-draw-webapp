@@ -110,6 +110,38 @@ function nameplateTexture() {
   return t;
 }
 
+function makeWoodMaterial(vertical) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 512;
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#e2c79a';
+  g.fillRect(0, 0, 256, 512);
+  for (let i = 0; i < 90; i++) {
+    const shade = 120 + Math.floor(Math.random() * 70);
+    g.strokeStyle = `rgba(${shade},${Math.floor(shade * 0.78)},${Math.floor(shade * 0.48)},${0.10 + Math.random() * 0.22})`;
+    g.lineWidth = 0.7 + Math.random() * 2.4;
+    g.beginPath();
+    if (vertical) {
+      const x = Math.random() * 256;
+      g.moveTo(x, 0);
+      g.lineTo(x + (Math.random() * 10 - 5), 512);
+    } else {
+      const y = Math.random() * 512;
+      g.moveTo(0, y);
+      g.lineTo(256, y + (Math.random() * 14 - 7));
+    }
+    g.stroke();
+  }
+  const texture = new THREE_DEFAULT.CanvasTexture(canvas);
+  texture.wrapS = THREE_DEFAULT.RepeatWrapping;
+  texture.wrapT = THREE_DEFAULT.RepeatWrapping;
+  texture.repeat.set(vertical ? 0.8 : 1.6, vertical ? 1.4 : 0.7);
+  texture.colorSpace = THREE_DEFAULT.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return new THREE_DEFAULT.MeshStandardMaterial({ map: texture, color: 0xfff6e8, roughness: 0.78, metalness: 0.0 });
+}
+
 const RACK_COUNTS = [10, 10, 10, 10, 9];
 const RACK_GAP_X = 0.252;
 const RACK_GAP_Y = 0.208;
@@ -230,137 +262,196 @@ export function buildMachine(_THREE, root, materials) {
   }
 
   // Short clear vertical tube at the bottom centre, then a clear chute into the right-hand entry.
-  const tube = new T.Mesh(new T.CylinderGeometry(0.13, 0.13, 0.36, 28, 1, true), edgeGlass || glass);
+  const tube = new T.Mesh(new T.CylinderGeometry(0.13, 0.13, 0.26, 28, 1, true), edgeGlass || glass);
   tube.name = 'centre-exit-tube';
-  tube.position.set(0, -1.28, 0.26);
+  tube.position.set(0, -1.16, 0.28);
   frame.add(tube);
-  addCylinderZ(frame, 'exit-tube-rim', 0.16, 0.045, brightGold, 0, -1.08, 0.26, 28);
-  addCylinderZ(frame, 'exit-tube-foot', 0.16, 0.04, gold, 0, -1.46, 0.30, 28);
-  const selectorMouth = new T.Vector3(0, -1.10, 0.26);
-  const tubeExit = new T.Vector3(0, -1.46, 0.32);
+  addCylinderZ(frame, 'exit-tube-rim', 0.16, 0.045, brightGold, 0, -1.02, 0.28, 28);
+  addCylinderZ(frame, 'exit-tube-foot', 0.16, 0.04, gold, 0, -1.28, 0.32, 28);
+  const selectorMouth = new T.Vector3(0, -1.04, 0.28);
+  const tubeExit = new T.Vector3(0, -1.28, 0.34);
 
-  // ----- Receiving tray -----
-  // Local axes: +X to the right, +Y up, +Z toward the viewer.
-  // Left run is long and nearly flat (a whisper of fall toward the left wall).
-  // The floor then rises into a short higher pocket. A clear retainer at the
-  // lip stays down for balls 1–6 and stands up to hold the special ball.
+  // Receiving tray, copied from the wood CAD: one solid birch block.
+  // The exterior bottom is flat. The front wall's top edge follows the floor
+  // (level, then up the slope). Glass sits in a groove under that top edge.
+  // The right end wall is an L: tall at the back, stepped down at the front,
+  // leaving the open notch the chute drops into.
   const tray = new T.Group();
   tray.name = 'receiving-tray';
-  tray.position.set(0.08, -1.98, 0.86);
+  tray.position.set(0.02, -2.04, 0.78);
   frame.add(tray);
 
-  const leftInner = -1.18;
-  const slopeStart = 0.10;
-  const slopeEnd = 0.30;
-  const rightEnd = 0.64;
-  const leftEndY = -0.03;
-  const slopeLowY = 0.0;
-  const rightY = 0.24;
-  const channelZ = 0.0;
-  const innerDepth = 0.36;
-  const wallT = 0.045;
-  const floorT = 0.05;
-  const leftWallH = 0.50;
-  const rightWallH = 0.74;
-  const zBack = -innerDepth / 2;
-  const zFront = innerDepth / 2;
+  const woodWall = makeWoodMaterial(true);
+  const woodFloor = makeWoodMaterial(false);
+  const woodGroove = new T.MeshStandardMaterial({ color: 0x3a3128, roughness: 0.6, metalness: 0.04 });
+  const trayGlass = glass.clone();
+  trayGlass.opacity = 0.42;
+  trayGlass.color = new T.Color(0xd5e8ea);
 
-  const floorMat = new T.MeshStandardMaterial({ color: 0xc49645, metalness: 0.62, roughness: 0.36 });
-  const samples = [];
-  const pushSample = (x, y) => samples.push({ x, y });
-  pushSample(leftInner - wallT, leftEndY);
-  const flatSteps = 6;
-  for (let i = 0; i <= flatSteps; i++) {
-    const u = i / flatSteps;
-    pushSample(leftInner + (slopeStart - leftInner) * u, leftEndY + (slopeLowY - leftEndY) * u);
+  const wallT = 0.12;
+  const innerW = 0.40;
+  const zIn0 = -innerW / 2;
+  const zIn1 = innerW / 2;
+  const leftOuter = -1.40;
+  const leftInner = leftOuter + wallT;
+  const slopeStart = 0.06;
+  const slopeEnd = 0.58;
+  const rightInner = 1.08;
+  const rightOuter = rightInner + wallT;
+  const floorLeft = 0.30;
+  const floorRight = 0.50;
+  const frontTopLeft = 0.52;
+  const frontTopSlopeEnd = 0.70;
+  const backTopLeft = 0.60;
+  const backTopRight = 0.96;
+  const frontTopRight = 0.74;
+  const endLowTop = 0.62;
+  const channelZ = 0;
+  const zBack = zIn0 - wallT / 2;
+  const zFront = zIn1 + wallT / 2;
+  const glassSeat = 0.15;
+  const capH = 0.045;
+
+  function addTopWall(parent, name, x0, top0, x1, top1, zCenter, depth, material) {
+    const z0 = zCenter - depth / 2;
+    const z1 = zCenter + depth / 2;
+    const positions = new Float32Array([
+      x0, 0, z0, x1, 0, z0, x1, top1, z0, x0, top0, z0,
+      x0, 0, z1, x1, 0, z1, x1, top1, z1, x0, top0, z1
+    ]);
+    const indices = [
+      0, 2, 1, 0, 3, 2,
+      4, 5, 6, 4, 6, 7,
+      0, 1, 5, 0, 5, 4,
+      3, 6, 2, 3, 7, 6,
+      0, 4, 7, 0, 7, 3,
+      1, 2, 6, 1, 6, 5
+    ];
+    const geo = new T.BufferGeometry();
+    geo.setAttribute('position', new T.BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    const mesh = new T.Mesh(geo, material);
+    mesh.name = name;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
   }
-  const slopeSteps = 6;
-  for (let i = 1; i <= slopeSteps; i++) {
-    const u = i / slopeSteps;
-    pushSample(slopeStart + (slopeEnd - slopeStart) * u, slopeLowY + (rightY - slopeLowY) * u);
+  function addStrip(parent, name, x0, y0, x1, y1, z, height, thickness, material) {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const len = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx);
+    const mesh = new T.Mesh(new T.BoxGeometry(len, height, thickness), material);
+    mesh.name = name;
+    const midX = (x0 + x1) / 2;
+    const midY = (y0 + y1) / 2;
+    const nx = -Math.sin(angle);
+    const ny = Math.cos(angle);
+    mesh.position.set(midX + nx * height / 2, midY + ny * height / 2, z);
+    mesh.rotation.z = angle;
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
   }
-  pushSample(rightEnd, rightY);
-  for (let i = 0; i < samples.length - 1; i++) {
-    const a = samples[i], b = samples[i + 1];
-    addSegment(tray, `tray-floor-${i}`, a.x, a.y, b.x, b.y, channelZ, innerDepth + wallT, floorT, floorMat);
+
+  // Solid lower body, then the raised right floor sitting on it.
+  addBox(tray, 'wood-plinth', rightOuter - leftOuter, floorLeft, innerW + wallT * 2, woodWall,
+    (leftOuter + rightOuter) / 2, floorLeft / 2, 0);
+  addBox(tray, 'wood-raised-floor', rightOuter - slopeEnd, floorRight - floorLeft, innerW + wallT * 2, woodFloor,
+    (slopeEnd + rightOuter) / 2, floorLeft + (floorRight - floorLeft) / 2, 0);
+  // Sloping tread. A thin board following the ramp, on top of the plinth.
+  {
+    const dx = slopeEnd - slopeStart;
+    const dy = floorRight - floorLeft;
+    const len = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx);
+    const tread = new T.Mesh(new T.BoxGeometry(len, 0.045, innerW), woodFloor);
+    tread.name = 'wood-slope-tread';
+    tread.position.set((slopeStart + slopeEnd) / 2, (floorLeft + floorRight) / 2, 0);
+    tread.rotation.z = angle;
+    tread.receiveShadow = true;
+    tray.add(tread);
+    // Fill the triangle under the tread so the slope is solid wood, not a floating ramp.
+    addTopWall(tray, 'wood-slope-fill', slopeStart, floorLeft, slopeEnd, floorRight, 0, innerW, woodWall);
   }
+  // Flat floor skins so the grain runs along the channel.
+  addBox(tray, 'wood-floor-left', slopeStart - leftInner, 0.02, innerW, woodFloor,
+    (leftInner + slopeStart) / 2, floorLeft + 0.01, 0);
+  addBox(tray, 'wood-floor-right', rightInner - slopeEnd, 0.02, innerW, woodFloor,
+    (slopeEnd + rightInner) / 2, floorRight + 0.01, 0);
 
-  // Back wall steps up with the right bay. The right bay's back wall is notched for the chute.
-  addBox(tray, 'back-wall-left', slopeEnd - (leftInner - wallT), leftWallH, wallT, gold,
-    (leftInner - wallT + slopeEnd) / 2, leftWallH / 2, zBack - wallT / 2);
-  const notchW = 0.26;
-  const notchBottom = rightY + 0.16;
-  const rightBayX0 = slopeEnd;
-  const rightBayX1 = rightEnd + wallT;
-  const rightMid = (rightBayX0 + rightBayX1) / 2;
-  addBox(tray, 'back-wall-right-sill', rightBayX1 - rightBayX0, notchBottom, wallT, gold,
-    rightMid, notchBottom / 2, zBack - wallT / 2);
-  const postW = (rightBayX1 - rightBayX0 - notchW) / 2;
-  addBox(tray, 'notch-post-left', postW, rightWallH - notchBottom, wallT, brightGold,
-    rightBayX0 + postW / 2, notchBottom + (rightWallH - notchBottom) / 2, zBack - wallT / 2);
-  addBox(tray, 'notch-post-right', postW, rightWallH - notchBottom, wallT, brightGold,
-    rightBayX1 - postW / 2, notchBottom + (rightWallH - notchBottom) / 2, zBack - wallT / 2);
+  // Back wall: level on the left, then a vertical step up into the taller right bay.
+  addBox(tray, 'back-wall-left', slopeEnd - leftOuter, backTopLeft, wallT, woodWall,
+    (leftOuter + slopeEnd) / 2, backTopLeft / 2, zBack);
+  addBox(tray, 'back-wall-right', rightOuter - slopeEnd, backTopRight, wallT, woodWall,
+    (slopeEnd + rightOuter) / 2, backTopRight / 2, zBack);
+  // The step itself is the vertical wood face between the low run and the raised pocket.
+  addBox(tray, 'divider-step', wallT, backTopRight - backTopLeft, wallT, woodWall,
+    slopeEnd + wallT / 2, backTopLeft + (backTopRight - backTopLeft) / 2, zBack);
 
-  // Left end wall and right end wall (the right one repeats the notch so the entry reads from the side).
-  addBox(tray, 'left-end-wall', wallT, leftWallH, innerDepth + wallT * 2, gold,
-    leftInner - wallT / 2 - 0.01, leftWallH / 2, 0);
-  addBox(tray, 'right-end-lower', wallT, notchBottom, innerDepth + wallT, gold,
-    rightEnd + wallT / 2, notchBottom / 2, wallT * 0.1);
-  addBox(tray, 'right-end-post-back', wallT, rightWallH - notchBottom, 0.08, brightGold,
-    rightEnd + wallT / 2, notchBottom + (rightWallH - notchBottom) / 2, zBack + 0.04);
-  addBox(tray, 'right-end-post-front', wallT, rightWallH - notchBottom, 0.08, brightGold,
-    rightEnd + wallT / 2, notchBottom + (rightWallH - notchBottom) / 2, zFront - 0.06);
+  // Left end cap.
+  addBox(tray, 'left-end-wall', wallT, backTopLeft, innerW + wallT * 2, woodWall,
+    leftOuter + wallT / 2, backTopLeft / 2, 0);
 
-  // Gold rails above a clear front strip. The right rail steps up, matching the shape study.
-  const leftGlassH = leftWallH - 0.08;
-  const glassH = rightWallH - 0.10;
-  const leftPane = addBox(tray, 'tray-front-glass-left', slopeEnd - leftInner, leftGlassH, 0.016, glass,
-    (leftInner + slopeEnd) / 2, leftGlassH / 2 + 0.02, zFront + 0.012);
-  const rightPane = addBox(tray, 'tray-front-glass-right', rightEnd - slopeEnd + wallT, glassH, 0.016, glass,
-    (slopeEnd + rightEnd) / 2, glassH / 2 + 0.02, zFront + 0.012);
-  leftPane.castShadow = false;
-  rightPane.castShadow = false;
-  addBox(tray, 'front-rail-left', slopeEnd - leftInner + wallT, 0.045, wallT, brightGold,
-    (leftInner - wallT + slopeEnd) / 2, leftWallH - 0.02, zFront + wallT / 2);
-  addBox(tray, 'front-rail-right', rightBayX1 - slopeEnd, 0.05, wallT, brightGold,
-    (slopeEnd + rightBayX1) / 2, rightWallH - 0.03, zFront + wallT / 2);
-  addBox(tray, 'front-step', wallT, rightWallH - leftWallH, wallT, gold,
-    slopeEnd, leftWallH + (rightWallH - leftWallH) / 2, zFront + wallT / 2);
-  // Lower gold sill in front of the glass so the strip is framed.
-  addBox(tray, 'front-sill', rightEnd - leftInner + wallT * 2, 0.04, wallT, gold,
-    (leftInner + rightEnd) / 2, 0.0, zFront + wallT / 2);
+  // Front wall. Its top edge is level, then climbs with the floor. Glass is
+  // seated in a groove just under that edge, set back from the outer face.
+  addTopWall(tray, 'front-wall-flat', leftOuter, frontTopLeft, slopeStart, frontTopLeft, zFront, wallT, woodWall);
+  addTopWall(tray, 'front-wall-slope', slopeStart, frontTopLeft, slopeEnd, frontTopSlopeEnd, zFront, wallT, woodWall);
+  addBox(tray, 'front-wall-right', rightInner - slopeEnd, frontTopRight, wallT, woodWall,
+    (slopeEnd + rightInner) / 2, frontTopRight / 2, zFront);
 
-  // Clear retainer. Down (buried at the lip) while the six roll left; raised to keep the 7th in the pocket.
+  const glassZ = zFront - 0.012;
+  const grooveZ = zFront + 0.012;
+  addStrip(tray, 'glass-flat', leftInner + 0.02, floorLeft + 0.02, slopeStart, floorLeft + 0.02, glassZ, glassSeat, 0.012, trayGlass);
+  addStrip(tray, 'glass-slope', slopeStart, floorLeft + 0.02, slopeEnd, floorRight + 0.02, glassZ, glassSeat, 0.012, trayGlass);
+  addStrip(tray, 'glass-groove-flat', leftInner + 0.02, floorLeft + 0.015, slopeStart, floorLeft + 0.015, grooveZ, 0.012, 0.018, woodGroove);
+  addStrip(tray, 'glass-groove-slope', slopeStart, floorLeft + 0.015, slopeEnd, floorRight + 0.015, grooveZ, 0.012, 0.018, woodGroove);
+  addStrip(tray, 'front-cap-flat', leftOuter, frontTopLeft - capH, slopeStart, frontTopLeft - capH, zFront, capH, wallT, woodWall);
+  addStrip(tray, 'front-cap-slope', slopeStart, frontTopLeft - capH, slopeEnd, frontTopSlopeEnd - capH, zFront, capH, wallT, woodWall);
+
+  // Right end wall, L-shaped: tall against the back wall, stepped down toward the front.
+  const zStep = -0.02;
+  addBox(tray, 'end-wall-tall', wallT, backTopRight, (zStep - zIn0) + wallT, woodWall,
+    rightOuter - wallT / 2, backTopRight / 2, (zBack + zStep) / 2);
+  addBox(tray, 'end-wall-low', wallT, endLowTop, (zIn1 - zStep) + wallT, woodWall,
+    rightOuter - wallT / 2, endLowTop / 2, (zStep + zFront) / 2);
+
+  // Wood retainer. Down inside the platform while the six roll left; raised as
+  // the vertical divider that keeps the special ball on the high pocket.
   const retainer = new T.Group();
   retainer.name = 'special-ball-retainer';
-  retainer.position.set(slopeEnd, rightY, channelZ);
-  retainer.userData.baseY = rightY;
-  retainer.userData.travel = 0.26;
+  retainer.position.set(slopeEnd, floorRight, channelZ);
+  retainer.userData.baseY = floorRight;
+  retainer.userData.travel = 0.30;
   tray.add(retainer);
-  const retainerPanel = new T.Mesh(new T.BoxGeometry(0.018, 0.26, innerDepth * 0.92), materials.glass);
+  const retainerPanel = new T.Mesh(new T.BoxGeometry(0.045, 0.30, innerW * 0.96), woodWall);
   retainerPanel.name = 'retainer-panel';
-  retainerPanel.position.set(0, 0.13 - 0.26, 0);
-  retainerPanel.castShadow = false;
+  retainerPanel.position.set(0, 0.15 - 0.30, 0);
   retainer.add(retainerPanel);
-  const retainerRail = new T.Mesh(new T.BoxGeometry(0.03, 0.02, innerDepth * 0.92), brightGold);
-  retainerRail.name = 'retainer-cap';
-  retainerRail.position.set(0, 0.25 - 0.26, 0);
-  retainer.add(retainerRail);
+
+  const rightY = floorRight;
+  const samples = [
+    { x: leftInner, y: floorLeft },
+    { x: slopeStart, y: floorLeft },
+    { x: slopeEnd, y: floorRight },
+    { x: rightInner, y: floorRight }
+  ];
 
   function floorTopY(x) {
-    if (x <= slopeStart) {
-      const u = (x - leftInner) / (slopeStart - leftInner);
-      return leftEndY + (slopeLowY - leftEndY) * u;
-    }
-    if (x <= slopeEnd) {
+    let y = floorRight;
+    if (x <= slopeStart) y = floorLeft;
+    else if (x < slopeEnd) {
       const u = (x - slopeStart) / (slopeEnd - slopeStart);
-      return slopeLowY + (rightY - slopeLowY) * u;
+      y = floorLeft + (floorRight - floorLeft) * u;
     }
-    return rightY;
+    return y + 0.03;
   }
   function floorAngle(x) {
     if (x <= slopeStart || x >= slopeEnd) return 0;
-    return Math.atan2(rightY - slopeLowY, slopeEnd - slopeStart);
+    return Math.atan2(floorRight - floorLeft, slopeEnd - slopeStart);
   }
   function pointOnFloor(x) {
     const y = floorTopY(x);
@@ -370,7 +461,7 @@ export function buildMachine(_THREE, root, materials) {
 
   const mainRestX = [];
   for (let i = 0; i < 6; i++) mainRestX.push(leftInner + 0.04 + BALL_R + i * (BALL_D + 0.014));
-  const specialX = (slopeEnd + rightEnd) / 2;
+  const specialX = slopeEnd + (rightInner - slopeEnd) * 0.62;
 
   frame.updateMatrixWorld(true);
   const toWorld = v => tray.localToWorld(v.clone());
@@ -390,7 +481,7 @@ export function buildMachine(_THREE, root, materials) {
     return pts;
   }
 
-  const chuteEndLocal = pointOnFloor(specialX).add(new T.Vector3(0, 0.10, -0.04));
+  const chuteEndLocal = new T.Vector3(rightInner - 0.08, (endLowTop + backTopRight) / 2, 0.08);
   const chuteEnd = toWorld(chuteEndLocal);
   // Clear chute from the centre tube down into the notched right-hand entry.
   const chuteDir = new T.Vector3().subVectors(chuteEnd, tubeExit);
@@ -415,40 +506,40 @@ export function buildMachine(_THREE, root, materials) {
     specialRest.clone()
   ];
 
-  const trayFocus = toWorld(new T.Vector3((leftInner + rightEnd) / 2, 0.22, 0));
+  const trayFocus = toWorld(new T.Vector3((leftInner + rightInner) / 2, 0.42, 0));
   const outlinePoint = (x, y, z) => toWorld(new T.Vector3(x, y, z));
   const trayOutline = {
     floor: samples.map(s => outlinePoint(s.x, s.y, zFront)),
     crest: [
-      outlinePoint(leftInner - wallT, leftWallH, zFront),
-      outlinePoint(slopeEnd, leftWallH, zFront),
-      outlinePoint(slopeEnd, rightWallH, zFront),
-      outlinePoint(rightEnd + wallT, rightWallH, zFront)
+      outlinePoint(leftOuter, frontTopLeft, zFront),
+      outlinePoint(slopeStart, frontTopLeft, zFront),
+      outlinePoint(slopeEnd, frontTopSlopeEnd, zFront),
+      outlinePoint(rightOuter, backTopRight, zFront)
     ],
     glass: [
-      outlinePoint(leftInner, 0.02, zFront + 0.02),
-      outlinePoint(rightEnd, 0.02, zFront + 0.02),
-      outlinePoint(rightEnd, glassH, zFront + 0.02),
-      outlinePoint(leftInner, glassH, zFront + 0.02)
+      outlinePoint(leftInner, floorLeft + 0.04, zFront),
+      outlinePoint(slopeEnd, floorRight + 0.04, zFront),
+      outlinePoint(slopeEnd, frontTopSlopeEnd - 0.02, zFront),
+      outlinePoint(leftInner, frontTopLeft - 0.02, zFront)
     ]
   };
 
   // Groups the fallback renderer and older diagnostics still look up.
-  tray.userData.slotLength = rightEnd - leftInner;
-  tray.userData.slotWidth = innerDepth;
+  tray.userData.slotLength = rightInner - leftInner;
+  tray.userData.slotWidth = innerW;
   tray.userData.openAt = 'none';
   const mainLane = new T.Group();
   mainLane.name = 'left-run';
-  mainLane.position.set((leftInner + slopeStart) / 2, 0.08, 0);
+  mainLane.position.set((leftInner + slopeStart) / 2, floorLeft, 0);
   mainLane.userData.slotLength = slopeStart - leftInner;
-  mainLane.userData.slotWidth = innerDepth;
+  mainLane.userData.slotWidth = innerW;
   mainLane.userData.openAt = 'right';
   tray.add(mainLane);
   const specialLane = new T.Group();
   specialLane.name = 'right-pocket';
-  specialLane.position.set((slopeEnd + rightEnd) / 2, rightY + 0.08, 0);
-  specialLane.userData.slotLength = rightEnd - slopeEnd;
-  specialLane.userData.slotWidth = innerDepth;
+  specialLane.position.set((slopeEnd + rightInner) / 2, floorRight, 0);
+  specialLane.userData.slotLength = rightInner - slopeEnd;
+  specialLane.userData.slotWidth = innerW;
   specialLane.userData.openAt = 'left';
   tray.add(specialLane);
 
