@@ -479,12 +479,12 @@ export function buildMachine(_THREE, root, materials) {
     [1, 2, 6, 5],
     [2, 3, 7, 6]
   ], woodFloor);
-  // Joinery: end walls and the rear wall run long. Every other board
-  // stops against a face, with one thickness of the long board left proud.
+  // Flush joinery. Outer faces share one plane. The meeting board stops
+  // on that face, so the joint has thickness to hold, and nothing sticks past it.
   const slab = 0.09;
   const zRearBack = zB - wallT;
-  const zEndBack = zRearBack - wallT;
-  const zEndFront = zF + wallT;
+  const zEndBack = zRearBack;
+  const zEndFront = zF;
   function addTimber(name, a0, a1, a2, a3, b0, b1, b2, b3) {
     const verts = [a0, a1, a2, a3, b0, b1, b2, b3];
     const positions = [];
@@ -514,7 +514,7 @@ export function buildMachine(_THREE, root, materials) {
     leftOuter + wallT / 2, (endY + backLift) / 2, (zEndFront + zEndBack) / 2);
   addBox(tray, 'right-end-wall', wallT, rightEndY + backLift, zEndFront - zEndBack, woodWall,
     rightOuter - wallT / 2, (rightEndY + backLift) / 2, (zEndFront + zEndBack) / 2);
-  // Rear wall runs sideways past the stem, so the stem ends on its back face.
+  // Rear wall reaches the stem so the stem can stop on its back face. Outer back plane stays flush.
   addTimber('rear-wall-left',
     V(leftInner, 0, zB), V(leftInner, endY + backLift, zB), V(-flatHalf, peakY + backLift, zB), V(-flatHalf, 0, zB),
     V(leftInner, 0, zRearBack), V(leftInner, endY + backLift, zRearBack), V(-flatHalf, peakY + backLift, zRearBack), V(-flatHalf, 0, zRearBack));
@@ -541,8 +541,8 @@ export function buildMachine(_THREE, root, materials) {
     -flatHalf - wallT / 2, stemWallY, (zRearBack + zT) / 2);
   addBox(tray, 'stem-wall-right', wallT, stemWallH, stemLen, woodWall,
     flatHalf + wallT / 2, stemWallY, (zRearBack + zT) / 2);
-  // End stop runs past both stem sides so the lap is visible.
-  addBox(tray, 'tunnel-end-stop', flatHalf * 2 + wallT * 4, stemWallH, wallT, woodWall,
+  // End stop is flush with the outside of the stem sides.
+  addBox(tray, 'tunnel-end-stop', flatHalf * 2 + wallT * 2, stemWallH, wallT, woodWall,
     0, stemWallY, zT - wallT / 2);
   // Plank housed into the rear wall and into the end stop. Top stays the flat centre.
   const plankBack = zT - wallT;
