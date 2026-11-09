@@ -6,8 +6,10 @@
 // A mirrored pose must fail assertWideCameraHandedness.
 export const PHOTO_NEAR_PILLAR_SIDE = 'right';
 export const POST_X = 1.62;
-export const WIDE_CAMERA_POS = [3.85, -1.05, 7.95];
-export const WIDE_CAMERA_TARGET = [-0.02, -0.62, 0.18];
+// Elevation: camera Y is above the look target, so the view looks down
+// onto the top of the drum. X stays positive so the nearer post stays screen-right.
+export const WIDE_CAMERA_POS = [3.6, 1.45, 7.5];
+export const WIDE_CAMERA_TARGET = [-0.04, -0.55, 0.18];
 
 function nearerPostScreenSide(position, target, postX = POST_X) {
   const eye = position;
