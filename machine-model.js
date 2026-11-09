@@ -276,6 +276,17 @@ export function buildMachine(_THREE, root, materials) {
     cap.position.set(Math.cos(a) * drumRadius, drumY + Math.sin(a) * drumRadius, drumDepth / 2 + frontTube * 0.65);
     frame.add(cap);
   }
+  // Short pins bridging the front hoop to the back hoop, one at each spoke and one between.
+  const spacerCount = 12;
+  for (let i = 0; i < spacerCount; i++) {
+    const a = -Math.PI / 2 + i * Math.PI * 2 / spacerCount;
+    const x = Math.cos(a) * drumRadius;
+    const y = drumY + Math.sin(a) * drumRadius;
+    addBeam(frame, 'rim-spacer',
+      [x, y, -drumDepth / 2],
+      [x, y, drumDepth / 2],
+      0.018, brightGold, 8);
+  }
 
   // Six flat spokes on a gold hub. The hub turns; the drum shell stays fixed.
   const rotor = new T.Group();
