@@ -198,14 +198,26 @@ export function buildMachine(_THREE, root, materials) {
     frame.add(foot);
   }
 
-  // Side standards holding the drum ring. Thick enough to read as solid brass, not wire.
-  for (const x of [-1.62, 1.62]) {
-    addBeam(frame, 'side-standard', [x, -2.90, 0.05], [x, 0.95, 0.05], 0.16, gold);
-    addBeam(frame, 'side-standard-front', [x * 0.98, -2.90, 0.55], [x * 0.92, -0.20, 0.55], 0.11, brightGold);
+  // Unitary cradle: the cheeks, the sill and the back web are one frame
+  // grown out of the pedestal. The wheel is not stood on separate rods.
+  const cheekX = 1.90;
+  const cheekT = 0.36;
+  const cheekBottom = -2.96;
+  const cheekTop = 1.14;
+  const cheekZ = 0.08;
+  const cheekD = 0.96;
+  for (const x of [-cheekX, cheekX]) {
+    addBox(frame, 'cradle-cheek', cheekT, cheekTop - cheekBottom, cheekD, gold,
+      x, (cheekTop + cheekBottom) / 2, cheekZ);
+    addCylinderZ(frame, x < 0 ? 'axle-cap-left' : 'axle-cap-right',
+      0.22, 0.18, brightGold, Math.sign(x) * 1.58, drumY, 0.50, 28);
   }
-  addBeam(frame, 'rear-crossbar', [-1.55, 0.95, -0.28], [1.55, 0.95, -0.28], 0.08, gold);
-  addCylinderZ(frame, 'axle-cap-left', 0.15, 0.12, brightGold, -1.58, drumY, 0.52, 24);
-  addCylinderZ(frame, 'axle-cap-right', 0.15, 0.12, brightGold, 1.58, drumY, 0.52, 24);
+  // Sill on the pedestal, split only so the drop tube can pass at the centre.
+  addBox(frame, 'cradle-sill-left', 1.20, 0.28, 0.78, gold, -1.28, -2.70, 0.12);
+  addBox(frame, 'cradle-sill-right', 1.20, 0.28, 0.78, gold, 1.28, -2.70, 0.12);
+  // Back web under the drum, tying both cheeks into the base.
+  addBox(frame, 'cradle-back', cheekX * 2 + cheekT, 1.40, 0.18, darkGold, 0, -2.10, -0.78);
+  addBox(frame, 'cradle-top-tie', cheekX * 2 - 0.2, 0.20, 0.18, gold, 0, 1.02, -0.78);
 
   // Five-column acrylic magazine. Tops of the columns line up; 49 balls leave one tube one ball short.
   const rack = new T.Group();
