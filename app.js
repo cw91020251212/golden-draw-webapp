@@ -1,5 +1,5 @@
 import * as THREE from './three.module.js';
-import { WIDE_CAMERA_POS, WIDE_CAMERA_TARGET } from './wide-camera.js?v=ref-shot-10';
+import { WIDE_CAMERA_POS, WIDE_CAMERA_TARGET } from './wide-camera.js?v=ref-shot-20';
 import { buildMachine, BALL_R } from './machine-model.js?v=ref-shot-19';
 import {CompatibleRenderer} from './compat.js?v=front-wide-20';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
