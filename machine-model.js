@@ -172,8 +172,10 @@ export function buildMachine(_THREE, root, materials) {
   root.add(frame);
 
   const drumY = 0.16;
-  const drumRadius = 1.50;
-  const drumDepth = 1.06;
+  // Modest bump so the mixing drum, its glass and its rings grow together.
+  const drumScale = 1.08;
+  const drumRadius = 1.50 * drumScale;
+  const drumDepth = 1.06 * drumScale;
 
   // Wood pedestal, same grain as the tray, with the lotteries nameplate.
   // Base stays under the drum, but reaches left to carry the long tray arm.
@@ -203,7 +205,8 @@ export function buildMachine(_THREE, root, materials) {
   const postSize = 0.26;
   const postBottom = -2.90;
   const postX = 0.58;
-  const postTop = drumY - Math.sqrt(1.55 * 1.55 - postX * postX) - 0.02;
+  const drumClear = drumRadius + 0.05;
+  const postTop = drumY - Math.sqrt(drumClear * drumClear - postX * postX) - 0.02;
   const postY = (postTop + postBottom) / 2;
   const postH = postTop - postBottom;
   for (const x of [-postX, postX]) {
@@ -247,45 +250,45 @@ export function buildMachine(_THREE, root, materials) {
   drumWall.rotation.x = Math.PI / 2;
   drumWall.position.set(0, drumY, 0);
   frame.add(drumWall);
-  const glassZ = drumDepth / 2 - 0.012;
-  const glassRadius = drumRadius - 0.155;
+  const glassZ = drumDepth / 2 - 0.012 * drumScale;
+  const glassRadius = drumRadius - 0.155 * drumScale;
   const frontGlass = new T.Mesh(new T.CircleGeometry(glassRadius, 96), glass);
   frontGlass.name = 'drum-front-glass';
   frontGlass.position.set(0, drumY, glassZ);
   frame.add(frontGlass);
-  const backGlass = new T.Mesh(new T.CircleGeometry(drumRadius - 0.11, 96), glass);
+  const backGlass = new T.Mesh(new T.CircleGeometry(drumRadius - 0.11 * drumScale, 96), glass);
   backGlass.name = 'drum-back-glass';
   backGlass.position.set(0, drumY, -drumDepth / 2 + 0.02);
   backGlass.rotation.y = Math.PI;
   frame.add(backGlass);
-  addRing(frame, 'rear-rim', drumRadius, 0.085, -drumDepth / 2, gold, 96, drumY);
-  addRing(frame, 'front-rim', drumRadius, 0.105, drumDepth / 2, brightGold, 96, drumY);
-  addRing(frame, 'front-rim-inner', drumRadius - 0.16, 0.03, drumDepth / 2 + 0.01, gold, 96, drumY);
+  addRing(frame, 'rear-rim', drumRadius, 0.085 * drumScale, -drumDepth / 2, gold, 96, drumY);
+  addRing(frame, 'front-rim', drumRadius, 0.105 * drumScale, drumDepth / 2, brightGold, 96, drumY);
+  addRing(frame, 'front-rim-inner', drumRadius - 0.16 * drumScale, 0.03 * drumScale, drumDepth / 2 + 0.01 * drumScale, gold, 96, drumY);
   const screwCount = 18;
   for (let i = 0; i < screwCount; i++) {
     const a = -Math.PI / 2 + i * Math.PI * 2 / screwCount;
-    const cap = new T.Mesh(new T.SphereGeometry(0.042, 16, 12), brightGold);
+    const cap = new T.Mesh(new T.SphereGeometry(0.042 * drumScale, 16, 12), brightGold);
     cap.name = 'rim-rivet';
-    cap.position.set(Math.cos(a) * drumRadius, drumY + Math.sin(a) * drumRadius, drumDepth / 2 + 0.07);
+    cap.position.set(Math.cos(a) * drumRadius, drumY + Math.sin(a) * drumRadius, drumDepth / 2 + 0.07 * drumScale);
     frame.add(cap);
   }
 
   // Six flat spokes on a gold hub. The hub turns; the drum shell stays fixed.
   const rotor = new T.Group();
   rotor.name = 'six-spoke-hub';
-  rotor.position.set(0, drumY, 0.12);
+  rotor.position.set(0, drumY, 0.12 * drumScale);
   frame.add(rotor);
-  addCylinderZ(rotor, 'hub', 0.26, 0.14, gold, 0, 0, 0, 48);
-  addCylinderZ(rotor, 'hub-cap', 0.12, 0.18, brightGold, 0, 0, 0.02, 32);
+  addCylinderZ(rotor, 'hub', 0.26 * drumScale, 0.14 * drumScale, gold, 0, 0, 0, 48);
+  addCylinderZ(rotor, 'hub-cap', 0.12 * drumScale, 0.18 * drumScale, brightGold, 0, 0, 0.02 * drumScale, 32);
   for (let i = 0; i < 6; i++) {
     const angle = -Math.PI / 2 + i * Math.PI / 3;
-    const inner = 0.24, barOuter = 1.22;
+    const inner = 0.24 * drumScale, barOuter = 1.22 * drumScale;
     addBeam(rotor, `spoke-${i + 1}`,
       [Math.cos(angle) * inner, Math.sin(angle) * inner, 0],
       [Math.cos(angle) * barOuter, Math.sin(angle) * barOuter, 0],
-      0.042, brightGold);
-    const paddle = addBox(rotor, `paddle-${i + 1}`, 0.16, 0.50, 0.022, brightGold,
-      Math.cos(angle) * 1.18, Math.sin(angle) * 1.18, 0.04);
+      0.042 * drumScale, brightGold);
+    const paddle = addBox(rotor, `paddle-${i + 1}`, 0.16 * drumScale, 0.50 * drumScale, 0.022 * drumScale, brightGold,
+      Math.cos(angle) * 1.18 * drumScale, Math.sin(angle) * 1.18 * drumScale, 0.04 * drumScale);
     paddle.rotation.z = angle;
   }
 
@@ -302,7 +305,7 @@ export function buildMachine(_THREE, root, materials) {
   // the sphere, and its front face is flush with the pedestal. Local x=0 is the flat centre.
   tray.position.set(0, -2.82, 0);
   // Whole lower trough and its glass, smaller against the drum and pedestal.
-  const trayScale = 0.60;
+  const trayScale = 0.80;
   tray.scale.setScalar(trayScale);
   frame.add(tray);
 
@@ -639,7 +642,8 @@ export function buildMachine(_THREE, root, materials) {
   function pointOnFloor(x) {
     const y = floorTopY(x);
     const a = floorAngle(x);
-    return new T.Vector3(x - Math.sin(a) * BALL_R, y + Math.cos(a) * BALL_R, channelZ);
+    const ballLocal = BALL_R / trayScale;
+    return new T.Vector3(x - Math.sin(a) * ballLocal, y + Math.cos(a) * ballLocal, channelZ);
   }
 
   const mainRestX = [];
@@ -666,7 +670,7 @@ export function buildMachine(_THREE, root, materials) {
 
   // Ball centre: straight down from the chute mouth onto the long track, then forward.
   const landZ = (tubeExit.z - tray.position.z) / tray.scale.z;
-  const landLocal = new T.Vector3(0, peakY + 0.02 + BALL_R, landZ);
+  const landLocal = new T.Vector3(0, peakY + 0.02 + BALL_R / trayScale, landZ);
   const chuteEnd = toWorld(landLocal);
   const peakRest = toWorld(pointOnFloor(0));
   const dropPath = [
