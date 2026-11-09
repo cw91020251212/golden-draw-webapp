@@ -473,11 +473,11 @@ main>details a{color:#725a2c}
   .layout > .controls-card,
   .layout > .results-column { width: 100%; }
   .layout > .controls-card { margin: 0; }
-  .studio { height: 300px; min-height: 0; }
+  .studio { height: 620px; min-height: 0; }
 }
 
 @media (max-width: 380px) {
-  .studio { height: 290px; }
+  .studio { height: 560px; }
 }
 
 

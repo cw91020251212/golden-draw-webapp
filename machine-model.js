@@ -79,31 +79,19 @@ function nameplateTexture() {
   c.width = 1024;
   c.height = 280;
   const g = c.getContext('2d');
-  g.fillStyle = '#e6c36a';
+  g.fillStyle = '#e8c56a';
   g.fillRect(0, 0, 1024, 280);
-  g.strokeStyle = '#8d6424';
-  g.lineWidth = 10;
-  g.strokeRect(16, 16, 992, 248);
-  // Simplified four-loop mark, the shape printed on the real cabinet.
-  const mark = (cx, cy, r, color) => {
-    g.beginPath();
-    g.arc(cx, cy, r, 0, Math.PI * 2);
-    g.fillStyle = color;
-    g.fill();
-  };
-  mark(168, 118, 46, '#1f4f86');
-  mark(214, 118, 46, '#1f4f86');
-  mark(168, 164, 46, '#1f4f86');
-  mark(214, 164, 46, '#1f4f86');
-  mark(191, 141, 16, '#e6c36a');
+  g.strokeStyle = '#8a5e22';
+  g.lineWidth = 14;
+  g.strokeRect(18, 18, 988, 244);
   g.fillStyle = '#3a2a12';
-  g.font = '700 64px "Noto Sans CJK TC","WenQuanYi Micro Hei","Droid Sans Fallback",sans-serif';
-  g.textAlign = 'left';
+  g.font = '700 72px Georgia, "Times New Roman", serif';
+  g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillText('香港馬會獎券有限公司', 280, 118);
-  g.font = '600 40px Arial,sans-serif';
+  g.fillText('THE GOLDEN DRAW', 512, 118);
+  g.font = '600 36px Georgia, "Times New Roman", serif';
   g.fillStyle = '#5a4318';
-  g.fillText('HKJC Lotteries Limited', 284, 186);
+  g.fillText('RETRO SERIES  ·  49 BALLS', 512, 186);
   const t = new THREE_DEFAULT.CanvasTexture(c);
   t.colorSpace = THREE_DEFAULT.SRGBColorSpace;
   t.anisotropy = 4;
@@ -176,8 +164,9 @@ export function rackPosition(index) {
 export function buildMachine(_THREE, root, materials) {
   const T = _THREE || THREE_DEFAULT;
   const { gold, darkGold, brightGold, glass, edgeGlass } = materials;
-  const woodWall = makeWoodMaterial(true);
-  const woodFloor = makeWoodMaterial(false);
+  // Tray and pedestal stay the latest shape, finished in the same polished brass as the cage.
+  const woodWall = gold;
+  const woodFloor = brightGold;
   const frame = new T.Group();
   frame.name = 'mark-six-machine';
   root.add(frame);
@@ -196,7 +185,7 @@ export function buildMachine(_THREE, root, materials) {
   addBox(frame, 'cabinet-top', 3.55, 0.04, 1.60, woodFloor, -0.42, -2.90, baseFrontZ - 0.80);
   addBox(frame, 'cabinet-front-lip', 3.58, 0.05, 0.05, woodWall, -0.42, -2.92, baseFrontZ - 0.025);
   const plate = new T.Mesh(new T.BoxGeometry(1.72, 0.26, 0.02), new T.MeshStandardMaterial({
-    map: nameplateTexture(), metalness: 0.35, roughness: 0.45, color: 0xfff1c4
+    map: nameplateTexture(), metalness: 0.55, roughness: 0.32, color: 0xf3d48a
   }));
   plate.name = 'hkjc-nameplate';
   plate.position.set(0.02, -3.08, baseFrontZ + 0.01);
@@ -235,10 +224,16 @@ export function buildMachine(_THREE, root, materials) {
     rack.add(tube);
     if (column < 4) addBox(rack, 'magazine-divider', 0.016, rackHeight - 0.18, 0.03, brightGold, x + RACK_GAP_X / 2, rackMid, 0.30);
   }
-  const rackFace = new T.Mesh(new T.BoxGeometry(1.72, rackHeight - 0.12, 0.016), glass);
+  const rackGlass = glass.clone();
+  rackGlass.opacity = 0.04;
+  const rackFace = new T.Mesh(new T.BoxGeometry(1.72, rackHeight - 0.12, 0.012), rackGlass);
   rackFace.name = 'magazine-front-glass';
-  rackFace.position.set(0, rackMid, 0.32);
+  rackFace.position.set(0, rackMid, 0.34);
   rack.add(rackFace);
+  for (let bar = 0; bar < 9; bar++) {
+    const x = -0.76 + bar * 0.19;
+    addBox(rack, 'magazine-bar', 0.02, rackHeight - 0.22, 0.02, brightGold, x, rackMid, 0.38);
+  }
   addBox(frame, 'magazine-bridge', 1.28, 0.14, 0.58, gold, 0, 1.70, 0.04);
 
   // Transparent drum: thick gold front ring, clear wall, clear faces.
@@ -258,19 +253,16 @@ export function buildMachine(_THREE, root, materials) {
   backGlass.position.set(0, drumY, -drumDepth / 2 + 0.02);
   backGlass.rotation.y = Math.PI;
   frame.add(backGlass);
-  addRing(frame, 'rear-rim', drumRadius, 0.09, -drumDepth / 2, gold, 96, drumY);
-  addRing(frame, 'front-rim', drumRadius, 0.135, drumDepth / 2, brightGold, 96, drumY);
-  addRing(frame, 'front-rim-inner', drumRadius - 0.18, 0.028, drumDepth / 2 + 0.012, gold, 96, drumY);
-  // Covers are children of the glass, in the glass plane, just inside the bezel.
-  const screwRadius = glassRadius - 0.055;
+  addRing(frame, 'rear-rim', drumRadius, 0.085, -drumDepth / 2, gold, 96, drumY);
+  addRing(frame, 'front-rim', drumRadius, 0.105, drumDepth / 2, brightGold, 96, drumY);
+  addRing(frame, 'front-rim-inner', drumRadius - 0.16, 0.03, drumDepth / 2 + 0.01, gold, 96, drumY);
   const screwCount = 18;
   for (let i = 0; i < screwCount; i++) {
     const a = -Math.PI / 2 + i * Math.PI * 2 / screwCount;
-    const cap = new T.Mesh(new T.SphereGeometry(0.032, 16, 10), brightGold);
-    cap.scale.z = 0.4;
-    cap.name = 'glass-screw-cover';
-    cap.position.set(Math.cos(a) * screwRadius, Math.sin(a) * screwRadius, 0.032 * 0.4);
-    frontGlass.add(cap);
+    const cap = new T.Mesh(new T.SphereGeometry(0.042, 16, 12), brightGold);
+    cap.name = 'rim-rivet';
+    cap.position.set(Math.cos(a) * drumRadius, drumY + Math.sin(a) * drumRadius, drumDepth / 2 + 0.07);
+    frame.add(cap);
   }
 
   // Six flat spokes on a gold hub. The hub turns; the drum shell stays fixed.
@@ -278,18 +270,18 @@ export function buildMachine(_THREE, root, materials) {
   rotor.name = 'six-spoke-hub';
   rotor.position.set(0, drumY, 0.12);
   frame.add(rotor);
-  addCylinderZ(rotor, 'hub', 0.32, 0.22, gold, 0, 0, 0, 48);
-  addCylinderZ(rotor, 'hub-cap', 0.16, 0.26, brightGold, 0, 0, 0.02, 32);
+  addCylinderZ(rotor, 'hub', 0.26, 0.14, gold, 0, 0, 0, 48);
+  addCylinderZ(rotor, 'hub-cap', 0.12, 0.18, brightGold, 0, 0, 0.02, 32);
   for (let i = 0; i < 6; i++) {
     const angle = -Math.PI / 2 + i * Math.PI / 3;
-    const inner = 0.30, outer = 1.16;
-    addFlatBar(rotor, `spoke-${i + 1}`,
+    const inner = 0.24, barOuter = 1.22;
+    addBeam(rotor, `spoke-${i + 1}`,
       [Math.cos(angle) * inner, Math.sin(angle) * inner, 0],
-      [Math.cos(angle) * outer, Math.sin(angle) * outer, 0],
-      0.125, 0.048, brightGold);
-    const tip = new T.Mesh(new T.SphereGeometry(0.068, 14, 10), gold);
-    tip.position.set(Math.cos(angle) * outer, Math.sin(angle) * outer, 0);
-    rotor.add(tip);
+      [Math.cos(angle) * barOuter, Math.sin(angle) * barOuter, 0],
+      0.042, brightGold);
+    const paddle = addBox(rotor, `paddle-${i + 1}`, 0.16, 0.50, 0.022, brightGold,
+      Math.cos(angle) * 1.18, Math.sin(angle) * 1.18, 0.04);
+    paddle.rotation.z = angle;
   }
 
   // Mouth of the drum outlet. The clear guide tube is built once the tray floor is known.
@@ -342,7 +334,8 @@ export function buildMachine(_THREE, root, materials) {
   selectorMouth.set(0, drumInnerBottom, tubeZ);
   const tubeRadius = BALL_R + 0.05;
   const dropTubeMat = (edgeGlass || glass).clone();
-  dropTubeMat.opacity = 0.45;
+  dropTubeMat.color = new T.Color(0xf6e2a8);
+  dropTubeMat.opacity = 0.38;
   dropTubeMat.transparent = true;
   dropTubeMat.depthWrite = false;
   dropTubeMat.side = T.DoubleSide;
@@ -354,7 +347,7 @@ export function buildMachine(_THREE, root, materials) {
   guide.position.set(0, (tubeTopY + tubeBottomY) / 2, tubeZ);
   frame.add(guide);
   const tubeRing = (y, name) => {
-    const ring = new T.Mesh(new T.TorusGeometry(tubeRadius, 0.016, 10, 28), brightGold);
+    const ring = new T.Mesh(new T.TorusGeometry(tubeRadius, 0.038, 10, 28), brightGold);
     ring.name = name;
     ring.rotation.x = Math.PI / 2;
     ring.position.set(0, y, tubeZ);
