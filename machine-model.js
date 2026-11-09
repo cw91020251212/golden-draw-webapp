@@ -268,6 +268,20 @@ export function buildMachine(_THREE, root, materials) {
   addRing(frame, 'front-rim', drumRadius, frontTube, drumDepth / 2, brightGold, 96, drumY);
   addRing(frame, 'front-rim-inner', drumRadius - 0.07, 0.012, drumDepth / 2 + 0.006, gold, 96, drumY);
   addRing(frame, 'rear-rim-inner', drumRadius - 0.07, 0.012, -drumDepth / 2 - 0.006, gold, 96, drumY);
+  // Main frame: one vertical circle, with horizontal bars seated on it.
+  const frameRingR = drumRadius - 0.04;
+  addRing(frame, 'structural-ring', frameRingR, 0.052, 0, brightGold, 96, drumY);
+  const barHalf = frameRingR - 0.06;
+  addBeam(frame, 'frame-horizontal', [-barHalf, drumY, 0.04], [barHalf, drumY, 0.04], 0.026, brightGold, 12);
+  const upperY = drumY + 0.55;
+  const upperHalf = Math.sqrt(Math.max(0.25, barHalf * barHalf - 0.55 * 0.55));
+  addBeam(frame, 'frame-horizontal-upper', [-upperHalf, upperY, 0.04], [upperHalf, upperY, 0.04], 0.022, gold, 12);
+  for (const [x, y] of [[-barHalf, drumY], [barHalf, drumY], [-upperHalf, upperY], [upperHalf, upperY]]) {
+    const collar = new T.Mesh(new T.SphereGeometry(0.034, 12, 10), brightGold);
+    collar.name = 'frame-bar-cap';
+    collar.position.set(x, y, 0.04);
+    frame.add(collar);
+  }
   const screwCount = 18;
   for (let i = 0; i < screwCount; i++) {
     const a = -Math.PI / 2 + i * Math.PI * 2 / screwCount;
@@ -295,6 +309,10 @@ export function buildMachine(_THREE, root, materials) {
     tip.name = `spoke-tip-${i + 1}`;
     tip.position.set(Math.cos(angle) * barOuter, Math.sin(angle) * barOuter, 0);
     rotor.add(tip);
+    // Board that sweeps the balls. Six of these match the mixer in simulate().
+    const paddle = addBox(rotor, `mixing-paddle-${i + 1}`, 0.62, 0.26, 0.04, gold,
+      Math.cos(angle) * 0.78, Math.sin(angle) * 0.78, 0.08);
+    paddle.rotation.z = angle;
   }
   // Rear sun: finer rays plus finished horizontal bars, fixed on the back of the drum.
   const rearSun = new T.Group();
