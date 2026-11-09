@@ -198,17 +198,37 @@ export function buildMachine(_THREE, root, materials) {
     frame.add(foot);
   }
 
-  // Older Mark Six support, copied from the previous machine and planted
-  // on this pedestal. Same radii, same inward uprights, short front braces,
-  // axle joints, and the upper and lower crossbars.
-  const supportTop = drumY + 0.97;
-  for (const x of [-1.18, 1.18]) {
-    addBeam(frame, 'outer-upright-support', [x, -2.90, -0.18], [x * 0.93, supportTop, -0.18], 0.055, darkGold);
-    addBeam(frame, 'front-brace-support', [x, -2.86, 0.48], [x * 0.78, drumY - 0.73, 0.48], 0.045, gold);
-    addCylinderZ(frame, 'support-joint', 0.105, 0.10, brightGold, x * 0.93, drumY + 0.95, 0.49, 32);
+  // Locked photo spec: flat sill on the pedestal, thick curved cheeks into the axle.
+  // One brass assembly. Not thin sticks, and not a deep U under the drum.
+  const sillY = -2.80;
+  const sillH = 0.14;
+  addBox(frame, 'drum-sill-left', 1.05, sillH, 0.90, gold, -0.85, sillY, -0.02);
+  addBox(frame, 'drum-sill-right', 1.05, sillH, 0.90, gold, 0.85, sillY, -0.02);
+  const gear = new T.Mesh(new T.CylinderGeometry(0.10, 0.10, 0.05, 14), darkGold);
+  gear.name = 'sill-gear';
+  gear.rotation.z = Math.PI / 2;
+  gear.position.set(0.48, sillY + sillH * 0.5 + 0.04, 0.02);
+  gear.castShadow = true;
+  frame.add(gear);
+  function addCurvedCheek(name, xSign) {
+    const start = new T.Vector3(xSign * 1.12, sillY + sillH * 0.5, 0.18);
+    const control = new T.Vector3(xSign * 1.55, -1.05, 0.46);
+    const end = new T.Vector3(xSign * 0.38, drumY, 0.66);
+    const curve = new T.QuadraticBezierCurve3(start, control, end);
+    const mesh = new T.Mesh(new T.TubeGeometry(curve, 28, 0.13, 14, false), brightGold);
+    mesh.name = name;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    frame.add(mesh);
+    const boss = new T.Mesh(new T.CylinderGeometry(0.16, 0.16, 0.08, 20), brightGold);
+    boss.name = name + '-bearing';
+    boss.rotation.x = Math.PI / 2;
+    boss.position.copy(end);
+    boss.castShadow = true;
+    frame.add(boss);
   }
-  addBeam(frame, 'upper-drum-crossbar', [-1.10, supportTop, -0.16], [1.10, supportTop, -0.16], 0.045, darkGold);
-  addBeam(frame, 'lower-drum-crossbar', [-1.17, drumY - 1.52, -0.12], [1.17, drumY - 1.52, -0.12], 0.055, darkGold);
+  addCurvedCheek('cheek-left', -1);
+  addCurvedCheek('cheek-right', 1);
 
   // Five-column acrylic magazine. Tops of the columns line up; 49 balls leave one tube one ball short.
   const rack = new T.Group();
