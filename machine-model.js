@@ -115,12 +115,12 @@ function makeWoodMaterial(vertical) {
   canvas.width = 256;
   canvas.height = 512;
   const g = canvas.getContext('2d');
-  // Golden-oak, same family as the brass: tray and pedestal share this finish.
-  g.fillStyle = '#b8893c';
+  // Same golden oak on the tray and the pedestal, in the same hue as the brass.
+  g.fillStyle = '#b08a3e';
   g.fillRect(0, 0, 256, 512);
   for (let i = 0; i < 46; i++) {
-    const shade = 108 + Math.floor(Math.random() * 78);
-    g.strokeStyle = `rgba(${shade},${Math.floor(shade * 0.72)},${Math.floor(shade * 0.34)},${0.26 + Math.random() * 0.36})`;
+    const shade = 96 + Math.floor(Math.random() * 64);
+    g.strokeStyle = `rgba(${shade},${Math.floor(shade * 0.74)},${Math.floor(shade * 0.32)},${0.30 + Math.random() * 0.34})`;
     g.lineWidth = 1.4 + Math.random() * 3.2;
     g.beginPath();
     if (vertical) {
@@ -135,7 +135,7 @@ function makeWoodMaterial(vertical) {
     g.stroke();
   }
   for (let i = 0; i < 18; i++) {
-    g.strokeStyle = `rgba(120,78,28,${0.16 + Math.random() * 0.2})`;
+    g.strokeStyle = `rgba(92,58,28,${0.15 + Math.random() * 0.2})`;
     g.lineWidth = 0.6;
     g.beginPath();
     if (vertical) {
@@ -155,7 +155,7 @@ function makeWoodMaterial(vertical) {
   texture.repeat.set(vertical ? 1.1 : 1.8, vertical ? 1.6 : 0.85);
   texture.colorSpace = THREE_DEFAULT.SRGBColorSpace;
   texture.anisotropy = 8;
-  return new THREE_DEFAULT.MeshStandardMaterial({ map: texture, color: 0xffe4b0, roughness: 0.64, metalness: 0.06 });
+  return new THREE_DEFAULT.MeshStandardMaterial({ map: texture, color: 0xfff1c4, roughness: 0.7, metalness: 0.04 });
 }
 
 const RACK_COUNTS = [10, 10, 10, 10, 9];

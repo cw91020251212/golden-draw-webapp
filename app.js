@@ -42,14 +42,14 @@ const timelineRate=()=>quickActive?1:rate;
 const spinDirection=()=>-1;
 function motorSpeed(){return -3.45;}
 
-function envTexture(){const c=document.createElement('canvas');c.width=1024;c.height=512;const g=c.getContext('2d');g.fillStyle='#8d7344';g.fillRect(0,0,1024,512);const grad=g.createLinearGradient(0,0,0,512);grad.addColorStop(0,'#fff6df');grad.addColorStop(.32,'#e7c98a');grad.addColorStop(.55,'#245566');grad.addColorStop(1,'#c4a36a');g.fillStyle=grad;g.fillRect(0,0,1024,512);g.fillStyle='#ffe7b0';g.fillRect(90,30,140,220);g.fillStyle='#fff4d4';g.fillRect(590,70,70,290);g.fillStyle='#f3e2c0';g.fillRect(830,90,130,120);const t=new THREE.CanvasTexture(c);t.mapping=THREE.EquirectangularReflectionMapping;t.colorSpace=THREE.SRGBColorSpace;return t;}
+function envTexture(){const c=document.createElement('canvas');c.width=1024;c.height=512;const g=c.getContext('2d');g.fillStyle='#6f8290';g.fillRect(0,0,1024,512);const grad=g.createLinearGradient(0,0,0,512);grad.addColorStop(0,'#ffffff');grad.addColorStop(.35,'#b6c4c8');grad.addColorStop(.55,'#2e4757');grad.addColorStop(1,'#a6a398');g.fillStyle=grad;g.fillRect(0,0,1024,512);g.fillStyle='#ffeed1';g.fillRect(90,30,140,220);g.fillStyle='#ffffff';g.fillRect(590,70,70,290);g.fillStyle='#e5edec';g.fillRect(830,90,130,120);const t=new THREE.CanvasTexture(c);t.mapping=THREE.EquirectangularReflectionMapping;t.colorSpace=THREE.SRGBColorSpace;return t;}
 function ballTexture(n){const c=document.createElement('canvas');c.width=256;c.height=128;const g=c.getContext('2d');g.fillStyle=({red:'#cf292f',blue:'#226596',green:'#23834e'})[colorOf(n)];g.fillRect(0,0,256,128);for(let row=0;row<2;row++)for(let col=0;col<4;col++){const x=32+col*64,y=32+row*64;g.fillStyle='#fff4d1';g.beginPath();g.ellipse(x,y,23,21,0,0,Math.PI*2);g.fill();g.fillStyle='#3b3021';g.font='bold 24px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText(n,x,y+1);}const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;t.userData={number:n,color:colorOf(n)};return t;}
 function init(){scene=new THREE.Scene();scene.environment=envTexture();camera=new THREE.PerspectiveCamera(37,1,.1,70);camera.position.set(-2.85,1.22,4.35);cameraTarget.set(0.06,-0.08,0.22);try{renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'high-performance'});}catch{renderer=new CompatibleRenderer(()=>({balls,rotor,cupBallRecords,machineModel,receiverEntryLane,mainResultSlot,specialResultSlot,diverterGatePivot}));$('scene').dataset.renderer='compatible';}renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setClearColor(0x000000,0);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;$('scene').appendChild(renderer.domElement);$('loading').remove();
-scene.add(new THREE.HemisphereLight(0xfff1cc,0x6a5436,2.05));const key=new THREE.DirectionalLight(0xffe7b8,4.15);key.position.set(-4,7,5);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-5;key.shadow.camera.right=5;key.shadow.camera.top=7;key.shadow.camera.bottom=-4;key.shadow.bias=-.001;scene.add(key);const rim=new THREE.DirectionalLight(0xffd7a2,1.35);rim.position.set(4,2.2,-3);scene.add(rim);const front=new THREE.PointLight(0xffd89a,14,14);front.position.set(-1.2,1.4,4.2);scene.add(front);
+scene.add(new THREE.HemisphereLight(0xdcecf5,0x72664c,2.3));const key=new THREE.DirectionalLight(0xffe6b7,4.3);key.position.set(-4,7,5);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-5;key.shadow.camera.right=5;key.shadow.camera.top=7;key.shadow.camera.bottom=-4;key.shadow.bias=-.001;scene.add(key);const rim=new THREE.DirectionalLight(0xffe2b0,1.8);rim.position.set(3,3,-4);scene.add(rim);const front=new THREE.PointLight(0xffd08a,16,12);front.position.set(2,2,4);scene.add(front);
 root=new THREE.Group();scene.add(root);
-const gold=new THREE.MeshStandardMaterial({color:0xd6a63c,metalness:.9,roughness:.2});
-const darkGold=new THREE.MeshStandardMaterial({color:0xa67c2d,metalness:.86,roughness:.26});
-const brightGold=new THREE.MeshStandardMaterial({color:0xf2cc6a,metalness:.88,roughness:.16});
+const gold=new THREE.MeshStandardMaterial({color:0xc79a45,metalness:.88,roughness:.23});
+const darkGold=new THREE.MeshStandardMaterial({color:0x8e692d,metalness:.8,roughness:.3});
+const brightGold=new THREE.MeshStandardMaterial({color:0xe6bb67,metalness:.8,roughness:.2});
 const glass=new THREE.MeshPhysicalMaterial({color:0xd9f3f1,metalness:0,roughness:.06,transparent:true,opacity:.16,side:THREE.DoubleSide,depthWrite:false});
 const edgeGlass=new THREE.MeshPhysicalMaterial({color:0xe7fbfb,roughness:.08,metalness:.15,transparent:true,opacity:.30,depthWrite:false});
 machineModel=buildMachine(THREE,root,{gold,darkGold,brightGold,glass,edgeGlass});
@@ -62,7 +62,7 @@ receiverEntryLane=machineModel.receiverEntryLane;
 mainResultSlot=machineModel.mainResultSlot;
 specialResultSlot=machineModel.specialResultSlot;
 diverterGatePivot=machineModel.diverterGatePivot;
-const floorMat=new THREE.MeshStandardMaterial({color:0x2a5964,roughness:.55,metalness:.18});
+const floorMat=new THREE.MeshStandardMaterial({color:0x254755,roughness:.55,metalness:.2});
 const floor=new THREE.Mesh(new THREE.CylinderGeometry(2.7,2.95,.20,96),floorMat);
 floor.position.y=-3.62;floor.receiveShadow=true;scene.add(floor);
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.ShadowMaterial({opacity:.22}));
@@ -341,7 +341,6 @@ function updateCamera(dt){
   desired.set(-2.85,1.22,4.35);target.set(0.06,-0.08,0.22);
  }
  if(!resultShot&&mode==='close')fitNarrowRunningCamera(mode,desired,target);
- if(!resultShot&&mode==='wide')frameDrumHero(desired,target);
  if(mode==='results'&&resultShot){
   resultShot.time+=dt;const t=reducedMotion()?1:smooth(Math.min(1,resultShot.time/2.6));
   camera.position.lerpVectors(resultShot.from,desired,t);cameraTarget.lerpVectors(resultShot.target,target,t);
@@ -355,34 +354,6 @@ function updateCamera(dt){
  camera.lookAt(cameraTarget);
 }
 function captureMachineBounds(){const excluded=new Set(balls.map(b=>b.mesh)),coords=[],v=new THREE.Vector3();machineBounds=new THREE.Box3().makeEmpty();root.traverse(o=>{if(!o.isMesh||excluded.has(o)||!o.geometry?.attributes?.position)return;const pos=o.geometry.attributes.position;for(let i=0;i<pos.count;i++){v.fromBufferAttribute(pos,i).applyMatrix4(o.matrixWorld);coords.push(v.x,v.y,v.z);machineBounds.expandByPoint(v);}});machineFitVertices=new Float32Array(coords);}
-const drumHeroCache=new Map();
-function frameDrumHero(desired,target){
- if(!fitProbeCamera)return;
- const key=camera.aspect.toFixed(4)+'|'+camera.fov.toFixed(2);
- let fit=drumHeroCache.get(key);
- const base=desired.clone().sub(target),baseDistance=base.length();
- if(baseDistance<.01)return;
- base.normalize();
- if(!fit){
-  const probe=fitProbeCamera;
-  probe.fov=camera.fov;probe.near=camera.near;probe.far=camera.far;probe.aspect=camera.aspect;probe.updateProjectionMatrix();probe.up.copy(camera.up);
-  const samples=[],cy=.16,cz=.28,R=1.68;
-  for(let i=0;i<20;i++){const a=i/20*Math.PI*2;samples.push(new THREE.Vector3(Math.cos(a)*R,cy+Math.sin(a)*R,cz));}
-  samples.push(new THREE.Vector3(-1.78,-.2,.15),new THREE.Vector3(1.78,-.2,.15));
-  let distance=baseDistance;const v=new THREE.Vector3(),targetSpan=1.62;
-  for(let iter=0;iter<14;iter++){
-   probe.position.copy(target).addScaledVector(base,distance);probe.lookAt(target);probe.updateMatrixWorld(true);
-   let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
-   for(const p of samples){v.copy(p).project(probe);minX=Math.min(minX,v.x);maxX=Math.max(maxX,v.x);minY=Math.min(minY,v.y);maxY=Math.max(maxY,v.y);}
-   const spanY=maxY-minY,spanX=maxX-minX;let scale=spanY/targetSpan;
-   if(spanX>1.78)scale=Math.max(scale,spanX/1.78);
-   if(Math.abs(scale-1)<.012)break;
-   distance*=Math.pow(scale,.9);
-  }
-  fit={distance};drumHeroCache.set(key,fit);
- }
- desired.copy(target).addScaledVector(base,fit.distance);
-}
 function fitNarrowRunningCamera(mode,desired,target){if(!machineBounds||!machineFitVertices||!fitProbeCamera)return;const center=machineBounds.getCenter(new THREE.Vector3()),ray=desired.clone().sub(target),baseDistance=ray.length();ray.normalize();const probe=fitProbeCamera,key=[mode,camera.aspect.toFixed(5),camera.fov.toFixed(3),...desired.toArray().map(v=>v.toFixed(3)),...target.toArray().map(v=>v.toFixed(3))].join('|');let fit=fitCameraCache.get(key);if(!fit){let distance=baseDistance,pivot=center.clone();probe.aspect=camera.aspect;probe.fov=camera.fov;probe.near=camera.near;probe.far=camera.far;probe.updateProjectionMatrix();probe.up.copy(camera.up);const v=new THREE.Vector3(),safeSpan=1.80;for(let iteration=0;iteration<24;iteration++){probe.position.copy(pivot).addScaledVector(ray,distance);probe.lookAt(pivot);probe.updateMatrixWorld(true);let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;for(let i=0;i<machineFitVertices.length;i+=3){v.set(machineFitVertices[i],machineFitVertices[i+1],machineFitVertices[i+2]).project(probe);minX=Math.min(minX,v.x);maxX=Math.max(maxX,v.x);minY=Math.min(minY,v.y);maxY=Math.max(maxY,v.y);}const spanY=maxY-minY,centerY=(minY+maxY)/2,halfView=distance*Math.tan(THREE.MathUtils.degToRad(camera.fov/2)),cosElevation=Math.max(.01,Math.sqrt(1-ray.y*ray.y));if(Math.abs(centerY)>.0005)pivot.y+=centerY*halfView/cosElevation;const extentX=Math.max(Math.abs(minX),Math.abs(maxX));if(Math.abs(centerY)<=.0005&&Math.abs(spanY-safeSpan)<=.001&&extentX<=.82)break;const ratio=spanY/safeSpan;if(Math.abs(ratio-1)>.0005)distance*=Math.pow(ratio,.9);if(extentX>.82)distance*=Math.pow(extentX/.82,.9);}fit={distance,pivotY:pivot.y};fitCameraCache.set(key,fit);}const fittedTarget=new THREE.Vector3(center.x,fit.pivotY,center.z);probe.position.copy(fittedTarget).addScaledVector(ray,fit.distance);desired.copy(probe.position);target.copy(fittedTarget);}
 function advanceTimeline(realSeconds){
  let left=realSeconds,guard=0;
