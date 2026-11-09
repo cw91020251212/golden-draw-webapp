@@ -301,6 +301,9 @@ export function buildMachine(_THREE, root, materials) {
   // Catch floor sits well below the drum exit. The trough stays in front of
   // the sphere, and its front face is flush with the pedestal. Local x=0 is the flat centre.
   tray.position.set(0, -2.82, 0);
+  // Whole lower trough and its glass, smaller against the drum and pedestal.
+  const trayScale = 0.60;
+  tray.scale.setScalar(trayScale);
   frame.add(tray);
 
   const woodGroove = new T.MeshStandardMaterial({ color: 0x3a3128, roughness: 0.6, metalness: 0.04 });
@@ -310,7 +313,7 @@ export function buildMachine(_THREE, root, materials) {
 
   const wallT = 0.10;
   const innerW = 0.56;
-  tray.position.z = baseFrontZ - innerW / 2;
+  tray.position.z = baseFrontZ - (innerW / 2) * trayScale;
   const zIn0 = -innerW / 2;
   const zIn1 = innerW / 2;
   const leftInner = -2.02;
@@ -326,11 +329,11 @@ export function buildMachine(_THREE, root, materials) {
   const rightEndY = peakY - slope * rightRun;
   // Inner face of the rear stop, in tray space. World z is the drum axis,
   // so the stem runs under the sphere to the bottom-centre exit.
-  const tunnelRear = -0.06 - tray.position.z;
+  const tunnelRear = (-0.06 - tray.position.z) / trayScale;
 
   // Clear pipe seated in the bottom outlet. It hangs downward only — the mouth
   // is flush with the inner drum floor so balls can still reach the hole.
-  const floorWorldY = tray.position.y + peakY;
+  const floorWorldY = tray.position.y + peakY * trayScale;
   const dropGap = BALL_D * 1.15;
   const tubeBottomY = floorWorldY + dropGap;
   const drumInnerBottom = drumY - (drumRadius - 0.08);
@@ -662,7 +665,7 @@ export function buildMachine(_THREE, root, materials) {
   const specialRoll = pathBetween(0, specialX);
 
   // Ball centre: straight down from the chute mouth onto the long track, then forward.
-  const landZ = tubeExit.z - tray.position.z;
+  const landZ = (tubeExit.z - tray.position.z) / tray.scale.z;
   const landLocal = new T.Vector3(0, peakY + 0.02 + BALL_R, landZ);
   const chuteEnd = toWorld(landLocal);
   const peakRest = toWorld(pointOnFloor(0));
