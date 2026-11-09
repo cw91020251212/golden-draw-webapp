@@ -198,19 +198,18 @@ export function buildMachine(_THREE, root, materials) {
     frame.add(foot);
   }
 
-  // Left-panel supports: two vertical rectangular pillars to the axle,
-  // plus a shorter angled brace in front of each. Not curves, not a U-cradle.
-  const pillarBottom = -2.88;
-  const pillarTop = drumY + 0.06;
-  for (const x of [-1.72, 1.72]) {
-    addBox(frame, 'axle-pillar', 0.24, pillarTop - pillarBottom, 0.22, gold,
-      x, (pillarTop + pillarBottom) / 2, 0.02);
-    addFlatBar(frame, 'front-brace',
-      [x * 0.78, -2.68, 0.72],
-      [x * 0.92, drumY - 0.35, 0.16],
-      0.14, 0.09, brightGold);
-    addCylinderZ(frame, x < 0 ? 'axle-cap-left' : 'axle-cap-right',
-      0.13, 0.08, brightGold, Math.sign(x) * 1.52, drumY, 0.36, 20);
+  // Four chunky vertical posts in a tight square under the hub.
+  // Straight up from the pedestal to the underside of the axle. No braces.
+  const postSize = 0.26;
+  const postBottom = -2.90;
+  const postX = 0.58;
+  const postTop = drumY - Math.sqrt(1.55 * 1.55 - postX * postX) - 0.02;
+  const postY = (postTop + postBottom) / 2;
+  const postH = postTop - postBottom;
+  for (const x of [-postX, postX]) {
+    for (const z of [0.02, 0.78]) {
+      addBox(frame, 'hub-post', postSize, postH, postSize, gold, x, postY, z);
+    }
   }
 
   // Five-column acrylic magazine. Tops of the columns line up; 49 balls leave one tube one ball short.
