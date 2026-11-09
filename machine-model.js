@@ -207,7 +207,7 @@ export function buildMachine(_THREE, root, materials) {
   const postY = (postTop + postBottom) / 2;
   const postH = postTop - postBottom;
   for (const x of [-postX, postX]) {
-    for (const z of [0.02, 0.78]) {
+    for (const z of [0.02, 0.36]) {
       addBox(frame, 'hub-post', postSize, postH, postSize, gold, x, postY, z);
     }
   }
