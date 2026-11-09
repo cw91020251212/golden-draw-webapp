@@ -115,12 +115,12 @@ function makeWoodMaterial(vertical) {
   canvas.width = 256;
   canvas.height = 512;
   const g = canvas.getContext('2d');
-  // Same warm oak as the pedestal: readable grain, not a washed-out plain panel.
-  g.fillStyle = '#c49a62';
+  // Golden-oak, same family as the brass: tray and pedestal share this finish.
+  g.fillStyle = '#b8893c';
   g.fillRect(0, 0, 256, 512);
   for (let i = 0; i < 46; i++) {
-    const shade = 92 + Math.floor(Math.random() * 70);
-    g.strokeStyle = `rgba(${shade},${Math.floor(shade * 0.62)},${Math.floor(shade * 0.32)},${0.28 + Math.random() * 0.38})`;
+    const shade = 108 + Math.floor(Math.random() * 78);
+    g.strokeStyle = `rgba(${shade},${Math.floor(shade * 0.72)},${Math.floor(shade * 0.34)},${0.26 + Math.random() * 0.36})`;
     g.lineWidth = 1.4 + Math.random() * 3.2;
     g.beginPath();
     if (vertical) {
@@ -135,7 +135,7 @@ function makeWoodMaterial(vertical) {
     g.stroke();
   }
   for (let i = 0; i < 18; i++) {
-    g.strokeStyle = `rgba(92,58,28,${0.15 + Math.random() * 0.2})`;
+    g.strokeStyle = `rgba(120,78,28,${0.16 + Math.random() * 0.2})`;
     g.lineWidth = 0.6;
     g.beginPath();
     if (vertical) {
@@ -155,7 +155,7 @@ function makeWoodMaterial(vertical) {
   texture.repeat.set(vertical ? 1.1 : 1.8, vertical ? 1.6 : 0.85);
   texture.colorSpace = THREE_DEFAULT.SRGBColorSpace;
   texture.anisotropy = 8;
-  return new THREE_DEFAULT.MeshStandardMaterial({ map: texture, color: 0xffffff, roughness: 0.74, metalness: 0.02 });
+  return new THREE_DEFAULT.MeshStandardMaterial({ map: texture, color: 0xffe4b0, roughness: 0.64, metalness: 0.06 });
 }
 
 const RACK_COUNTS = [10, 10, 10, 10, 9];
@@ -202,31 +202,31 @@ export function buildMachine(_THREE, root, materials) {
   plate.position.set(0.02, -3.08, baseFrontZ + 0.01);
   frame.add(plate);
   for (const [x, z] of [[-1.95, 0.62], [1.15, 0.62], [-1.95, -0.15], [1.15, -0.15]]) {
-    addBox(frame, 'foot-stem', 0.09, 0.22, 0.09, darkGold, x, -3.38, z);
-    const foot = new T.Mesh(new T.CylinderGeometry(0.13, 0.15, 0.07, 28), gold);
+    addBox(frame, 'foot-stem', 0.14, 0.22, 0.14, gold, x, -3.38, z);
+    const foot = new T.Mesh(new T.CylinderGeometry(0.18, 0.21, 0.08, 28), brightGold);
     foot.name = 'round-foot';
     foot.position.set(x, -3.50, z);
     frame.add(foot);
   }
 
-  // Side standards holding the drum ring.
+  // Side standards holding the drum ring. Thick enough to read as solid brass, not wire.
   for (const x of [-1.62, 1.62]) {
-    addBeam(frame, 'side-standard', [x, -2.90, 0.05], [x, 0.95, 0.05], 0.055, darkGold);
-    addBeam(frame, 'side-standard-front', [x * 0.98, -2.90, 0.55], [x * 0.92, -0.20, 0.55], 0.04, gold);
+    addBeam(frame, 'side-standard', [x, -2.90, 0.05], [x, 0.95, 0.05], 0.16, gold);
+    addBeam(frame, 'side-standard-front', [x * 0.98, -2.90, 0.55], [x * 0.92, -0.20, 0.55], 0.11, brightGold);
   }
-  addBeam(frame, 'rear-crossbar', [-1.55, 0.95, -0.28], [1.55, 0.95, -0.28], 0.045, darkGold);
-  addCylinderZ(frame, 'axle-cap-left', 0.09, 0.08, brightGold, -1.58, drumY, 0.52, 24);
-  addCylinderZ(frame, 'axle-cap-right', 0.09, 0.08, brightGold, 1.58, drumY, 0.52, 24);
+  addBeam(frame, 'rear-crossbar', [-1.55, 0.95, -0.28], [1.55, 0.95, -0.28], 0.08, gold);
+  addCylinderZ(frame, 'axle-cap-left', 0.15, 0.12, brightGold, -1.58, drumY, 0.52, 24);
+  addCylinderZ(frame, 'axle-cap-right', 0.15, 0.12, brightGold, 1.58, drumY, 0.52, 24);
 
   // Five-column acrylic magazine. Tops of the columns line up; 49 balls leave one tube one ball short.
   const rack = new T.Group();
   rack.name = 'five-column-magazine';
   frame.add(rack);
   const rackBottom = 1.78, rackTop = 4.88, rackMid = (rackBottom + rackTop) / 2, rackHeight = rackTop - rackBottom;
-  addBox(rack, 'magazine-back', 1.78, rackHeight, 0.05, darkGold, 0, rackMid, -0.28);
-  addBox(rack, 'magazine-top-cap', 1.88, 0.07, 0.62, brightGold, 0, rackTop, 0.02);
-  addBox(rack, 'magazine-bottom-cap', 1.88, 0.08, 0.62, gold, 0, rackBottom, 0.02);
-  for (const x of [-0.90, 0.90]) addBox(rack, 'magazine-side', 0.055, rackHeight, 0.58, darkGold, x, rackMid, 0.02);
+  addBox(rack, 'magazine-back', 1.78, rackHeight, 0.08, gold, 0, rackMid, -0.28);
+  addBox(rack, 'magazine-top-cap', 1.88, 0.10, 0.62, brightGold, 0, rackTop, 0.02);
+  addBox(rack, 'magazine-bottom-cap', 1.88, 0.11, 0.62, gold, 0, rackBottom, 0.02);
+  for (const x of [-0.90, 0.90]) addBox(rack, 'magazine-side', 0.09, rackHeight, 0.58, gold, x, rackMid, 0.02);
   for (let column = 0; column < 5; column++) {
     const x = (column - 2) * RACK_GAP_X;
     const tube = new T.Mesh(new T.CylinderGeometry(0.16, 0.16, rackHeight - 0.16, 20, 1, true), edgeGlass || glass);
@@ -239,7 +239,7 @@ export function buildMachine(_THREE, root, materials) {
   rackFace.name = 'magazine-front-glass';
   rackFace.position.set(0, rackMid, 0.32);
   rack.add(rackFace);
-  addBox(frame, 'magazine-bridge', 1.20, 0.10, 0.55, gold, 0, 1.70, 0.04);
+  addBox(frame, 'magazine-bridge', 1.28, 0.14, 0.58, gold, 0, 1.70, 0.04);
 
   // Transparent drum: thick gold front ring, clear wall, clear faces.
   const drumWall = new T.Mesh(new T.CylinderGeometry(drumRadius - 0.08, drumRadius - 0.08, drumDepth, 96, 1, true), edgeGlass || glass);
@@ -258,9 +258,9 @@ export function buildMachine(_THREE, root, materials) {
   backGlass.position.set(0, drumY, -drumDepth / 2 + 0.02);
   backGlass.rotation.y = Math.PI;
   frame.add(backGlass);
-  addRing(frame, 'rear-rim', drumRadius, 0.05, -drumDepth / 2, darkGold, 96, drumY);
-  addRing(frame, 'front-rim', drumRadius, 0.078, drumDepth / 2, brightGold, 96, drumY);
-  addRing(frame, 'front-rim-inner', drumRadius - 0.13, 0.022, drumDepth / 2 + 0.008, gold, 96, drumY);
+  addRing(frame, 'rear-rim', drumRadius, 0.09, -drumDepth / 2, gold, 96, drumY);
+  addRing(frame, 'front-rim', drumRadius, 0.135, drumDepth / 2, brightGold, 96, drumY);
+  addRing(frame, 'front-rim-inner', drumRadius - 0.18, 0.028, drumDepth / 2 + 0.012, gold, 96, drumY);
   // Covers are children of the glass, in the glass plane, just inside the bezel.
   const screwRadius = glassRadius - 0.055;
   const screwCount = 18;
@@ -278,16 +278,16 @@ export function buildMachine(_THREE, root, materials) {
   rotor.name = 'six-spoke-hub';
   rotor.position.set(0, drumY, 0.12);
   frame.add(rotor);
-  addCylinderZ(rotor, 'hub', 0.24, 0.18, gold, 0, 0, 0, 48);
-  addCylinderZ(rotor, 'hub-cap', 0.11, 0.22, brightGold, 0, 0, 0.02, 32);
+  addCylinderZ(rotor, 'hub', 0.32, 0.22, gold, 0, 0, 0, 48);
+  addCylinderZ(rotor, 'hub-cap', 0.16, 0.26, brightGold, 0, 0, 0.02, 32);
   for (let i = 0; i < 6; i++) {
     const angle = -Math.PI / 2 + i * Math.PI / 3;
-    const inner = 0.22, outer = 1.22;
+    const inner = 0.30, outer = 1.16;
     addFlatBar(rotor, `spoke-${i + 1}`,
       [Math.cos(angle) * inner, Math.sin(angle) * inner, 0],
       [Math.cos(angle) * outer, Math.sin(angle) * outer, 0],
-      0.075, 0.028, brightGold);
-    const tip = new T.Mesh(new T.SphereGeometry(0.045, 14, 10), darkGold);
+      0.125, 0.048, brightGold);
+    const tip = new T.Mesh(new T.SphereGeometry(0.068, 14, 10), gold);
     tip.position.set(Math.cos(angle) * outer, Math.sin(angle) * outer, 0);
     rotor.add(tip);
   }
