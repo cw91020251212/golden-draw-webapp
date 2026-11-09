@@ -198,26 +198,17 @@ export function buildMachine(_THREE, root, materials) {
     frame.add(foot);
   }
 
-  // Unitary cradle: the cheeks, the sill and the back web are one frame
-  // grown out of the pedestal. The wheel is not stood on separate rods.
-  const cheekX = 1.90;
-  const cheekT = 0.36;
-  const cheekBottom = -2.96;
-  const cheekTop = 1.14;
-  const cheekZ = 0.08;
-  const cheekD = 0.96;
-  for (const x of [-cheekX, cheekX]) {
-    addBox(frame, 'cradle-cheek', cheekT, cheekTop - cheekBottom, cheekD, gold,
-      x, (cheekTop + cheekBottom) / 2, cheekZ);
-    addCylinderZ(frame, x < 0 ? 'axle-cap-left' : 'axle-cap-right',
-      0.22, 0.18, brightGold, Math.sign(x) * 1.58, drumY, 0.50, 28);
+  // Older Mark Six support, copied from the previous machine and planted
+  // on this pedestal. Same radii, same inward uprights, short front braces,
+  // axle joints, and the upper and lower crossbars.
+  const supportTop = drumY + 0.97;
+  for (const x of [-1.18, 1.18]) {
+    addBeam(frame, 'outer-upright-support', [x, -2.90, -0.18], [x * 0.93, supportTop, -0.18], 0.055, darkGold);
+    addBeam(frame, 'front-brace-support', [x, -2.86, 0.48], [x * 0.78, drumY - 0.73, 0.48], 0.045, gold);
+    addCylinderZ(frame, 'support-joint', 0.105, 0.10, brightGold, x * 0.93, drumY + 0.95, 0.49, 32);
   }
-  // Sill on the pedestal, split only so the drop tube can pass at the centre.
-  addBox(frame, 'cradle-sill-left', 1.20, 0.28, 0.78, gold, -1.28, -2.70, 0.12);
-  addBox(frame, 'cradle-sill-right', 1.20, 0.28, 0.78, gold, 1.28, -2.70, 0.12);
-  // Back web under the drum, tying both cheeks into the base.
-  addBox(frame, 'cradle-back', cheekX * 2 + cheekT, 1.40, 0.18, darkGold, 0, -2.10, -0.78);
-  addBox(frame, 'cradle-top-tie', cheekX * 2 - 0.2, 0.20, 0.18, gold, 0, 1.02, -0.78);
+  addBeam(frame, 'upper-drum-crossbar', [-1.10, supportTop, -0.16], [1.10, supportTop, -0.16], 0.045, darkGold);
+  addBeam(frame, 'lower-drum-crossbar', [-1.17, drumY - 1.52, -0.12], [1.17, drumY - 1.52, -0.12], 0.055, darkGold);
 
   // Five-column acrylic magazine. Tops of the columns line up; 49 balls leave one tube one ball short.
   const rack = new T.Group();
