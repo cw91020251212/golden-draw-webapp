@@ -594,3 +594,24 @@ body.live-draw .stage-caption{flex-wrap:nowrap}
 button.orbit-reset{position:relative;z-index:6;pointer-events:auto;flex:0 0 auto;min-height:26px;padding:3px 10px;border:1px solid #8a6424;border-radius:999px;background:linear-gradient(180deg,#f8dc8a,#d7a441);color:#3b2a10;font-size:12px;font-weight:700;letter-spacing:.3px;box-shadow:0 2px 0 #7c5a20,inset 0 1px 0 #fff6d4}
 button.orbit-reset:hover{background:linear-gradient(180deg,#ffe7a4,#e0b14e);color:#3b2a10}
 button.orbit-reset:active{transform:translateY(1px);box-shadow:0 1px 0 #7c5a20,inset 0 1px 0 #fff6d4}
+.music-dock{grid-column:1 / -1;position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch}
+.music-label-short{display:none}
+#music-play,#music-settings,#music-pick{white-space:nowrap}
+.controls-card .music-dock #music-settings{min-width:64px;padding-inline:12px}
+#music-play.is-on,#music-play[aria-pressed="true"]{color:#fff7df;background:#476657;border-color:#365243}
+.music-popover{position:absolute;z-index:30;right:0;bottom:calc(100% + 8px);width:min(280px,calc(100vw - 24px));padding:12px;border:1px solid #d9cda9;border-radius:12px;background:#fbfaf5;color:#26352f;box-shadow:0 10px 28px #051b2540;pointer-events:auto}
+.music-popover[hidden]{display:none !important}
+.music-popover:not([hidden]){display:grid;gap:8px}
+.music-popover-title{margin:0;font-size:15px;font-weight:700}
+.music-popover label{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px;font-weight:700}
+.music-popover input[type="range"]{flex:1;min-width:0;accent-color:#a98442}
+.music-popover p{margin:0;font-size:12px;line-height:1.45;color:#526154;font-weight:400}
+.music-file input{max-width:150px;font-size:12px;font-weight:400}
+.music-dock .music-popover button{min-height:40px;padding:8px 10px;font-size:14px;color:#30483a;background:#fff;border:1px solid #b8c2b4;box-shadow:none}
+body.live-draw #live-actions .music-dock{display:flex;flex:0 0 auto;flex-wrap:nowrap;gap:2px;grid-column:auto}
+body.live-draw #live-actions .music-label-full{display:none}
+body.live-draw #live-actions .music-label-short{display:inline}
+body.live-draw #live-actions #music-play{width:40px;min-width:40px;max-width:40px;height:44px;min-height:44px;max-height:44px;flex:0 0 40px;padding:2px;font-size:12px}
+body.live-draw #live-actions #music-settings{width:26px;min-width:26px;max-width:26px;height:44px;min-height:44px;max-height:44px;flex:0 0 26px;padding:0;font-size:12px}
+body.live-draw #live-actions .music-popover{color:#26352f}
+body.live-draw #live-actions .music-popover button{width:auto;min-width:0;max-width:none;height:auto;min-height:40px;max-height:none;flex:initial;padding:8px 10px;color:#30483a;background:#fff;font-size:14px;line-height:1.2}
