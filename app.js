@@ -1,5 +1,6 @@
 import * as THREE from './three.module.js';
 import { WIDE_CAMERA_POS, WIDE_CAMERA_TARGET } from './wide-camera.js?v=ref-shot-20';
+import { orbitFromOffset, orbitAround, nudgeOrbit } from './orbit-camera.js?v=ref-shot-28';
 import { buildMachine, BALL_R } from './machine-model.js?v=ref-shot-27';
 import {CompatibleRenderer} from './compat.js?v=ref-shot-27';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
@@ -34,6 +35,7 @@ let selectorMouth=null,selectorOcclusion=null,receiverEntryStart=null,receiverJu
 let mainResultSlot=null,specialResultSlot=null,diverterGatePivot=null;
 let diverterGateAngle=0,diverterGateTarget=0,diverterGateState='down',diverterGateTransition=null;
 let trayShotUntil=0,cameraHold=false,ballClose=null,snapCamera=false;
+let userOrbit=false,orbit=null,orbitDrag=null;
 const NORMAL_PICKUP_DURATION=3.6;
 const SPECIAL_PICKUP_DURATION=12;
 const pickupStart=i=>quickActive?0.9+i*1.45:8+i*19;
@@ -132,8 +134,10 @@ function beginRound(scroll=false){qaEvent('round-start',{round:batchIndex+1});
  if(soundOn)startAudio();if(scroll){$('studio').focus({preventScroll:true});$('studio').scrollIntoView({behavior:reducedMotion()?'auto':'smooth',block:'start'});}
 }
 function reset(){
+ userOrbit=false;orbit=null;orbitDrag=null;
  setLiveDrawDisplay(false);quickActive=false;quickSession=false;batchActive=false;batchIndex=0;batchResults=[];roundOrders=[];timelineAt=Date.now();leaveResults();clearCupBalls();phase='idle';paused=false;elapsed=0;order=[];revealed=[];nextIndex=0;extracting=null;clearNumbers();resetMachine();resetTickets(Number($('entry-count').value));
  $('entry-count').disabled=false;$('summary').classList.remove('copy-error');$('status').textContent='準備就緒';$('step').textContent='49 顆彩球 · 等候入鼓';$('instruction').textContent='準備就緒，等待抽獎開始。';$('start').disabled=false;setStartLabel();$('pause').disabled=true;$('pause').textContent='暫停';$('copy').disabled=true;$('summary').textContent='完成攪珠後，可按鈕揭曉每注，亦可一次複製全部號碼。';$('progressfill').style.width='0%';setMotor(0);setRolling(false);setEffectsActive(false);setStageStatus('待機／設定 · 小型構圖');syncDrum();
+ if(camera&&(view==='wide'||view==='auto')){camera.position.set(...WIDE_CAMERA_POS);cameraTarget.set(...WIDE_CAMERA_TARGET);camera.lookAt(cameraTarget);snapCamera=true;}
 }
 function finishRound(){
  if(!batchActive||phase!=='sorting'||!resultShotStable||!resultShotStableAt||performance.now()-resultShotStableAt<RESULT_SHOT_DWELL_MS)return;
@@ -307,6 +311,30 @@ function extraction(){
  }
 }
 const smooth=t=>t*t*(3-2*t);
+function applyUserOrbit(){
+ const eye=orbitAround(WIDE_CAMERA_TARGET,orbit);
+ camera.position.set(eye[0],eye[1],eye[2]);
+ cameraTarget.set(...WIDE_CAMERA_TARGET);
+ camera.lookAt(cameraTarget);
+}
+function ensureUserOrbit(){
+ if(userOrbit&&orbit)return;
+ const pivot=WIDE_CAMERA_TARGET;
+ orbit=orbitFromOffset([camera.position.x-pivot[0],camera.position.y-pivot[1],camera.position.z-pivot[2]]);
+ userOrbit=true;
+}
+function cameraBusy(){return !!(cameraHold||ballClose||resultShot);}
+function resetOfficialCamera(){
+ if(!camera)return;
+ userOrbit=false;orbit=null;orbitDrag=null;ballClose=null;
+ if(view==='results')leaveResults();
+ selectView('wide');
+ camera.position.set(...WIDE_CAMERA_POS);
+ cameraTarget.set(...WIDE_CAMERA_TARGET);
+ camera.lookAt(cameraTarget);
+ snapCamera=true;
+ setStageStatus('已回到預設全景');
+}
 let realTime=0;
 const BALL_CLOSE_HOLD=1.6;
 function startBallClose(mesh){if(view!=='wide'||!mesh)return;ballClose={mesh,start:realTime,hold:BALL_CLOSE_HOLD};}
@@ -324,6 +352,7 @@ function updateCamera(dt){
   ballClose=null;snapCamera=true;
  }
  if(cameraHold){camera.lookAt(cameraTarget);return;}
+ if(userOrbit&&orbit&&!resultShot&&view!=='results'){snapCamera=false;applyUserOrbit();return;}
  let mode=resultShot?'results':view;
  if(mode==='auto'){
   if(phase==='running'&&extracting){const progress=(elapsed-extracting.start)/extracting.duration;mode=progress>(extracting.index===6?.72:.40)?'results':'close';}
@@ -381,7 +410,7 @@ function animate(){
  $('progressfill').style.width=Math.min(99,(elapsed/(quickActive?3.5:DRAW_END))*100)+'%';
  if(!extracting){$('status').textContent=(quickActive?'':`第 ${batchIndex+1} / ${batchTotal} 注 · `)+(quickActive?'持續攪珠':elapsed<3?'彩球入鼓':'自動攪珠中');$('step').textContent=`已揭曉 ${revealed.length} / ${order.length} 顆`;}
  setMotor(.028);const extractProgress=extracting?(elapsed-extracting.start)/extracting.duration:0;setRolling(!!extracting&&extractProgress>=.60&&extractProgress<.99);
- }else{setMotor(0);setRolling(false);}if(!paused)updateCamera(realDt);renderer.render(scene,camera);if(pendingStableFrame){resultShotStableAt=performance.now();qaEvent('result-shot-stable',{round:pendingStableFrame.round,duration:pendingStableFrame.duration});pendingStableFrame=null;}
+ }else{setMotor(0);setRolling(false);}if(!paused||userOrbit)updateCamera(realDt);renderer.render(scene,camera);if(pendingStableFrame){resultShotStableAt=performance.now();qaEvent('result-shot-stable',{round:pendingStableFrame.round,duration:pendingStableFrame.duration});pendingStableFrame=null;}
 }
 setInterval(updateTimeline,250);
 // Required physical effects are unlocked by Start, never by the music toggle.
@@ -418,10 +447,88 @@ function setMotor(v){if(motor&&audio){motor.gain.setTargetAtTime(v*2.5,audio.cur
 function setRolling(active){if(rolling&&audio)rolling.gain.setTargetAtTime(active?.18:0,audio.currentTime,.018);}
 function collisionSound(speed,brightness){if(!audio||audio.state!=='running'||speed<.25||audio.currentTime-lastBallHit<.038)return;lastBallHit=audio.currentTime;playImpact(Math.min(.18,.045+speed*.035),brightness);}
 function playImpact(level=.16,brightness=.6){if(!audio||audio.state!=='running'||phase!=='running'||paused)return;const now=audio.currentTime,duration=.075+Math.random()*.055,len=Math.max(1,Math.floor(audio.sampleRate*duration)),buf=audio.createBuffer(1,len,audio.sampleRate),data=buf.getChannelData(0);for(let i=0;i<len;i++)data[i]=(Math.random()*2-1)*(1-i/len);const src=audio.createBufferSource(),filter=audio.createBiquadFilter(),gain=audio.createGain();src.buffer=buf;filter.type='bandpass';filter.frequency.value=500+brightness*1500;filter.Q.value=.7;gain.gain.setValueAtTime(level,now);gain.gain.exponentialRampToValueAtTime(.001,now+duration);src.connect(filter);filter.connect(gain);gain.connect(effectsBus);src.start(now);src.stop(now+duration);const thump=audio.createOscillator(),tg=audio.createGain();thump.type='sine';thump.frequency.setValueAtTime(105+Math.random()*35,now);thump.frequency.exponentialRampToValueAtTime(58,now+.075);tg.gain.setValueAtTime(level*.42,now);tg.gain.exponentialRampToValueAtTime(.001,now+.09);thump.connect(tg);tg.connect(effectsBus);thump.start(now);thump.stop(now+.1);src.onended=()=>{src.disconnect();filter.disconnect();gain.disconnect();};thump.onended=()=>{thump.disconnect();tg.disconnect();};}
-document.addEventListener('ticket:revealed',revealCupTicket);$('start').addEventListener('click',begin);$('reset').addEventListener('click',reset);$('live-pause')?.addEventListener('click',()=>$('pause').click());$('live-reset')?.addEventListener('click',()=>$('reset').click());$('live-settings-toggle')?.addEventListener('click',()=>{const overlay=$('live-settings-overlay');if(!overlay)return;overlay.hidden=!overlay.hidden;const settings=$('inline-settings');if(settings)settings.open=!overlay.hidden;$('live-settings-toggle').setAttribute('aria-expanded',String(!overlay.hidden));});$('settings-close')?.addEventListener('click',()=>{const settings=$('inline-settings');if(settings)settings.open=false;const overlay=$('live-settings-overlay');if(overlay)overlay.hidden=true;const toggle=$('live-settings-toggle');if(toggle)toggle.setAttribute('aria-expanded','false');});$('pause').addEventListener('click',()=>{updateTimeline();if(phase!=='running')return;paused=!paused;timelineAt=Date.now();syncDrum();$('pause').textContent=paused?'繼續攪珠':'暫停';if($('live-pause'))$('live-pause').textContent=paused?'繼續':'暫停';$('status').textContent=paused?'已暫停':'攪拌中';if(paused){setMotor(0);setRolling(false);setEffectsActive(false);}else{ensureEffects();if(soundOn)startAudio();}});$('speed').addEventListener('change',e=>{updateTimeline();rate=Number(e.target.value);updateTiming();});$('sound').addEventListener('click',()=>{soundOn=!soundOn;$('sound').setAttribute('aria-pressed',String(soundOn));$('sound').setAttribute('aria-label',soundOn?'關閉背景音樂':'開啟背景音樂');if(soundOn){$('musicstatus').textContent='背景音樂播放中';startAudio();}else{soundtrack.pause();try{soundtrack.currentTime=0;}catch{}$('musicstatus').textContent='背景音樂已關閉';}updateSettingsSummary();});document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{if(phase==='sorting'&&b.dataset.view!=='results')return;if(b.dataset.view!=='results')resultShot=null;selectView(b.dataset.view);}));$('scene').addEventListener('pointermove',e=>{const r=$('scene').getBoundingClientRect();mouseX=((e.clientX-r.left)/r.width-.5)*2;});$('scene').addEventListener('pointerleave',()=>mouseX=0);
+document.addEventListener('ticket:revealed',revealCupTicket);$('start').addEventListener('click',begin);$('reset').addEventListener('click',reset);$('live-pause')?.addEventListener('click',()=>$('pause').click());$('live-reset')?.addEventListener('click',()=>$('reset').click());$('live-settings-toggle')?.addEventListener('click',()=>{const overlay=$('live-settings-overlay');if(!overlay)return;overlay.hidden=!overlay.hidden;const settings=$('inline-settings');if(settings)settings.open=!overlay.hidden;$('live-settings-toggle').setAttribute('aria-expanded',String(!overlay.hidden));});$('settings-close')?.addEventListener('click',()=>{const settings=$('inline-settings');if(settings)settings.open=false;const overlay=$('live-settings-overlay');if(overlay)overlay.hidden=true;const toggle=$('live-settings-toggle');if(toggle)toggle.setAttribute('aria-expanded','false');});$('pause').addEventListener('click',()=>{updateTimeline();if(phase!=='running')return;paused=!paused;timelineAt=Date.now();syncDrum();$('pause').textContent=paused?'繼續攪珠':'暫停';if($('live-pause'))$('live-pause').textContent=paused?'繼續':'暫停';$('status').textContent=paused?'已暫停':'攪拌中';if(paused){setMotor(0);setRolling(false);setEffectsActive(false);}else{ensureEffects();if(soundOn)startAudio();}});$('speed').addEventListener('change',e=>{updateTimeline();rate=Number(e.target.value);updateTiming();});$('sound').addEventListener('click',()=>{soundOn=!soundOn;$('sound').setAttribute('aria-pressed',String(soundOn));$('sound').setAttribute('aria-label',soundOn?'關閉背景音樂':'開啟背景音樂');if(soundOn){$('musicstatus').textContent='背景音樂播放中';startAudio();}else{soundtrack.pause();try{soundtrack.currentTime=0;}catch{}$('musicstatus').textContent='背景音樂已關閉';}updateSettingsSummary();});document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{if(phase==='sorting'&&b.dataset.view!=='results')return;userOrbit=false;orbit=null;orbitDrag=null;snapCamera=true;if(b.dataset.view!=='results')resultShot=null;selectView(b.dataset.view);}));$('scene').addEventListener('pointermove',e=>{const r=$('scene').getBoundingClientRect();mouseX=((e.clientX-r.left)/r.width-.5)*2;});$('scene').addEventListener('pointerleave',()=>mouseX=0);
 $('entry-count').addEventListener('change',()=>{if(!batchActive&&!quickActive){setStartLabel();resetTickets(Number($('entry-count').value));}});
 // Pointer-down is the manual fast-start; pointer-up/click must not draw twice.
-$('scene').addEventListener('pointerdown',e=>{if(e.isPrimary&&e.button===0)startFromDrum();});
+$('orbit-reset')?.addEventListener('click',resetOfficialCamera);
+$('scene').addEventListener('pointerdown',e=>{
+ if(e.pointerType==='touch'||e.button!==0)return;
+ orbitDrag={type:'mouse',id:e.pointerId,x:e.clientX,y:e.clientY,moved:false};
+ try{$('scene').setPointerCapture(e.pointerId);}catch{}
+});
+$('scene').addEventListener('pointermove',e=>{
+ if(!orbitDrag||orbitDrag.type!=='mouse'||e.pointerId!==orbitDrag.id)return;
+ const dx=e.clientX-orbitDrag.x,dy=e.clientY-orbitDrag.y;
+ if(!orbitDrag.moved&&Math.hypot(dx,dy)<5)return;
+ orbitDrag.moved=true;
+ if(cameraBusy()){orbitDrag.x=e.clientX;orbitDrag.y=e.clientY;return;}
+ ensureUserOrbit();
+ orbit=nudgeOrbit(orbit,dx,dy,1);
+ orbitDrag.x=e.clientX;orbitDrag.y=e.clientY;
+ applyUserOrbit();
+});
+$('scene').addEventListener('pointerup',e=>{
+ if(!orbitDrag||orbitDrag.type!=='mouse'||e.pointerId!==orbitDrag.id)return;
+ const moved=orbitDrag.moved;orbitDrag=null;
+ if(!moved)startFromDrum();
+});
+$('scene').addEventListener('pointercancel',e=>{if(orbitDrag&&e.pointerId===orbitDrag.id)orbitDrag=null;});
+$('scene').addEventListener('wheel',e=>{
+ if(cameraBusy())return;
+ e.preventDefault();
+ ensureUserOrbit();
+ const scale=Math.exp(e.deltaY*0.0012);
+ orbit=nudgeOrbit(orbit,0,0,1/scale);
+ applyUserOrbit();
+},{passive:false});
+function touchMid(list){
+ let x=0,y=0;for(const t of list){x+=t.clientX;y+=t.clientY;}
+ x/=list.length;y/=list.length;
+ const a=list[0],b=list[1];
+ return {x,y,dist:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)||1};
+}
+$('scene').addEventListener('touchstart',e=>{
+ if(e.touches.length>=2){
+  e.preventDefault();
+  const mid=touchMid(e.touches);
+  orbitDrag={type:'touch',x:mid.x,y:mid.y,dist:mid.dist,moved:false};
+ }else if(e.touches.length===1&&!(orbitDrag&&orbitDrag.type==='touch')){
+  const t=e.touches[0];
+  orbitDrag={type:'tap',x:t.clientX,y:t.clientY,moved:false};
+ }
+},{passive:false});
+$('scene').addEventListener('touchmove',e=>{
+ if(e.touches.length>=2){
+  e.preventDefault();
+  const mid=touchMid(e.touches);
+  if(!orbitDrag||orbitDrag.type!=='touch')orbitDrag={type:'touch',x:mid.x,y:mid.y,dist:mid.dist,moved:false};
+  const dx=mid.x-orbitDrag.x,dy=mid.y-orbitDrag.y,pinch=mid.dist/orbitDrag.dist;
+  if(cameraBusy()){orbitDrag.x=mid.x;orbitDrag.y=mid.y;orbitDrag.dist=mid.dist;return;}
+  ensureUserOrbit();
+  orbit=nudgeOrbit(orbit,dx,dy,pinch);
+  orbitDrag.x=mid.x;orbitDrag.y=mid.y;orbitDrag.dist=mid.dist;orbitDrag.moved=true;
+  applyUserOrbit();
+ }else if(e.touches.length===1&&orbitDrag&&orbitDrag.type==='tap'){
+  const t=e.touches[0];
+  if(Math.hypot(t.clientX-orbitDrag.x,t.clientY-orbitDrag.y)>12)orbitDrag.moved=true;
+ }
+},{passive:false});
+$('scene').addEventListener('touchend',e=>{
+ if(e.touches.length>=2){
+  const mid=touchMid(e.touches);
+  orbitDrag={type:'touch',x:mid.x,y:mid.y,dist:mid.dist,moved:true};
+  return;
+ }
+ if(e.touches.length===1){
+  const t=e.touches[0];
+  orbitDrag={type:'tap',x:t.clientX,y:t.clientY,moved:true};
+  return;
+ }
+ const tap=orbitDrag&&orbitDrag.type==='tap'&&!orbitDrag.moved;
+ orbitDrag=null;
+ if(tap)startFromDrum();
+},{passive:false});
+$('scene').addEventListener('touchcancel',()=>{orbitDrag=null;});
 $('scene').addEventListener('click',e=>{if(e.detail===0)startFromDrum();});
 $('scene').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();if(!e.repeat)startFromDrum();}});
 $('copy').addEventListener('click',async()=>{if(!batchResults.length)return;const text=getTicketsCopyText()+'\n（隨機娛樂模擬，非開獎預測；特別號不是單式填寫號碼。）';const feedback=$('summary');feedback.classList.remove('copy-error');feedback.textContent='';try{await navigator.clipboard.writeText(text);$('copy').textContent='全部已複製 ✓';setTimeout(()=>$('copy').textContent='複製全部號碼 ↗',1800);}catch{feedback.textContent=text+' — 請長按選取複製。';feedback.classList.add('copy-error');}});
