@@ -107,8 +107,9 @@ export class CompatibleRenderer {
     if (diverterGatePivot) {
       diverterGatePivot.updateMatrixWorld(true);
       const panel=diverterGatePivot.getObjectByName('retainer-panel');
-      if(panel){panel.updateMatrixWorld(true);const vertices=[[-.01,.13,-.14],[.01,.13,-.14],[.01,.13,.14],[-.01,.13,.14]]
-        .map(v=>panel.localToWorld(new THREE.Vector3(...v)));path(vertices,'#e7fbff',2,'#d7f4f088');}
+      if(panel){panel.updateMatrixWorld(true);      const hw=.021,hh=.25,hd=.15;
+      const vertices=[[-hw,-hh,-hd],[hw,-hh,-hd],[hw,hh,-hd],[-hw,hh,-hd],[-hw,-hh,-hd]]
+        .map(v=>panel.localToWorld(new THREE.Vector3(...v)));path(vertices,'#f6d278',2,'#e7c56a88');}
     }
 
     const reds = new Set([1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46]);

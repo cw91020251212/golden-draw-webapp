@@ -79,31 +79,19 @@ function nameplateTexture() {
   c.width = 1024;
   c.height = 280;
   const g = c.getContext('2d');
-  g.fillStyle = '#e6c36a';
+  g.fillStyle = '#e8c56a';
   g.fillRect(0, 0, 1024, 280);
-  g.strokeStyle = '#8d6424';
-  g.lineWidth = 10;
-  g.strokeRect(16, 16, 992, 248);
-  // Simplified four-loop mark, the shape printed on the real cabinet.
-  const mark = (cx, cy, r, color) => {
-    g.beginPath();
-    g.arc(cx, cy, r, 0, Math.PI * 2);
-    g.fillStyle = color;
-    g.fill();
-  };
-  mark(168, 118, 46, '#1f4f86');
-  mark(214, 118, 46, '#1f4f86');
-  mark(168, 164, 46, '#1f4f86');
-  mark(214, 164, 46, '#1f4f86');
-  mark(191, 141, 16, '#e6c36a');
+  g.strokeStyle = '#8a5e22';
+  g.lineWidth = 14;
+  g.strokeRect(18, 18, 988, 244);
   g.fillStyle = '#3a2a12';
-  g.font = '700 64px "Noto Sans CJK TC","WenQuanYi Micro Hei","Droid Sans Fallback",sans-serif';
-  g.textAlign = 'left';
+  g.font = '700 72px Georgia, "Times New Roman", serif';
+  g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillText('香港馬會獎券有限公司', 280, 118);
-  g.font = '600 40px Arial,sans-serif';
+  g.fillText('THE GOLDEN DRAW', 512, 118);
+  g.font = '600 36px Georgia, "Times New Roman", serif';
   g.fillStyle = '#5a4318';
-  g.fillText('HKJC Lotteries Limited', 284, 186);
+  g.fillText('RETRO SERIES  ·  49 BALLS', 512, 186);
   const t = new THREE_DEFAULT.CanvasTexture(c);
   t.colorSpace = THREE_DEFAULT.SRGBColorSpace;
   t.anisotropy = 4;
@@ -176,47 +164,82 @@ export function rackPosition(index) {
 export function buildMachine(_THREE, root, materials) {
   const T = _THREE || THREE_DEFAULT;
   const { gold, darkGold, brightGold, glass, edgeGlass } = materials;
-  const woodWall = makeWoodMaterial(true);
-  const woodFloor = makeWoodMaterial(false);
+  // Tray and pedestal stay the latest shape, finished in the same polished brass as the cage.
+  const woodWall = gold;
+  const woodFloor = brightGold;
   const frame = new T.Group();
   frame.name = 'mark-six-machine';
   root.add(frame);
 
   const drumY = 0.16;
-  const drumRadius = 1.50;
-  const drumDepth = 1.06;
+  // Modest bump so the mixing drum, its glass and its rings grow together.
+  const drumScale = 1.08;
+  const drumRadius = 1.50 * drumScale;
+  const drumDepth = 1.06 * drumScale;
 
-  // Wood pedestal, same grain as the tray, with the lotteries nameplate.
-  // Base stays under the drum, but reaches left to carry the long tray arm.
-  // Plinth dropped with the tray so the catch floor can sit under the drum ring.
-  const baseCenterZ = 0.62;
-  const baseDepth = 1.70;
-  const baseFrontZ = baseCenterZ + baseDepth / 2;
-  addBox(frame, 'lower-cabinet', 3.70, 0.36, baseDepth, woodWall, -0.42, -3.08, baseCenterZ);
-  addBox(frame, 'cabinet-top', 3.55, 0.04, 1.60, woodFloor, -0.42, -2.90, baseFrontZ - 0.80);
-  addBox(frame, 'cabinet-front-lip', 3.58, 0.05, 0.05, woodWall, -0.42, -2.92, baseFrontZ - 0.025);
-  const plate = new T.Mesh(new T.BoxGeometry(1.72, 0.26, 0.02), new T.MeshStandardMaterial({
-    map: nameplateTexture(), metalness: 0.35, roughness: 0.45, color: 0xfff1c4
+  // Stepped plinth in the proportions of the original pedestal: a thick block,
+  // a wider skirt, an inset front panel and a centred nameplate. The width
+  // follows this tray so both ends of the trough sit on the block, and the
+  // front face stays flush with the tray. The top is at y=-2.90, where the
+  // hub posts land.
+  const baseFrontZ = 1.47;
+  const baseDepth = 1.64;
+  const baseCenterZ = baseFrontZ - baseDepth / 2;
+  const baseCenterX = -0.48;
+  const baseWidth = 2.84;
+  const topY = -2.90;
+  const plinthCapH = 0.08;
+  const bodyH = 0.38;
+  const skirtH = 0.11;
+  const skirtBottom = topY - plinthCapH - bodyH - skirtH;
+  const bodyCenterY = skirtBottom + skirtH + bodyH / 2;
+  addBox(frame, 'cabinet-skirt', baseWidth + 0.14, skirtH, baseDepth + 0.08, darkGold,
+    baseCenterX, skirtBottom + skirtH / 2, baseCenterZ - 0.02);
+  addBox(frame, 'lower-cabinet', baseWidth, bodyH, baseDepth, gold,
+    baseCenterX, bodyCenterY, baseCenterZ);
+  addBox(frame, 'cabinet-top', baseWidth - 0.06, plinthCapH, baseDepth - 0.02, brightGold,
+    baseCenterX, topY - plinthCapH / 2, baseCenterZ);
+  addBox(frame, 'cabinet-front-panel', 2.16, 0.28, 0.028, darkGold,
+    baseCenterX, bodyCenterY, baseFrontZ + 0.012);
+  addBox(frame, 'cabinet-front-inset', 1.96, 0.20, 0.018, gold,
+    baseCenterX, bodyCenterY, baseFrontZ + 0.030);
+  const plate = new T.Mesh(new T.BoxGeometry(1.16, 0.15, 0.018), new T.MeshStandardMaterial({
+    map: nameplateTexture(), metalness: 0.45, roughness: 0.38, color: 0xf3d48a
   }));
   plate.name = 'hkjc-nameplate';
-  plate.position.set(0.02, -3.08, baseFrontZ + 0.01);
+  plate.position.set(baseCenterX, bodyCenterY, baseFrontZ + 0.046);
+  plate.castShadow = true;
   frame.add(plate);
-  for (const [x, z] of [[-1.95, 0.62], [1.15, 0.62], [-1.95, -0.15], [1.15, -0.15]]) {
-    addBox(frame, 'foot-stem', 0.14, 0.22, 0.14, gold, x, -3.38, z);
-    const foot = new T.Mesh(new T.CylinderGeometry(0.18, 0.21, 0.08, 28), brightGold);
-    foot.name = 'round-foot';
-    foot.position.set(x, -3.50, z);
-    frame.add(foot);
+  const footH = 0.07;
+  const footInsetX = baseWidth / 2 - 0.26;
+  const footInsetZ = baseDepth / 2 - 0.30;
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const x = baseCenterX + sx * footInsetX;
+      const z = baseCenterZ + sz * footInsetZ;
+      addBox(frame, 'foot-stem', 0.08, 0.04, 0.08, darkGold, x, skirtBottom - 0.02, z);
+      const foot = new T.Mesh(new T.CylinderGeometry(0.10, 0.12, footH, 24), brightGold);
+      foot.name = 'round-foot';
+      foot.position.set(x, skirtBottom - footH / 2, z);
+      foot.castShadow = true;
+      frame.add(foot);
+    }
   }
 
-  // Side standards holding the drum ring. Thick enough to read as solid brass, not wire.
-  for (const x of [-1.62, 1.62]) {
-    addBeam(frame, 'side-standard', [x, -2.90, 0.05], [x, 0.95, 0.05], 0.16, gold);
-    addBeam(frame, 'side-standard-front', [x * 0.98, -2.90, 0.55], [x * 0.92, -0.20, 0.55], 0.11, brightGold);
+  // Four chunky vertical posts in a tight square under the hub.
+  // Straight up from the pedestal to the underside of the axle. No braces.
+  const postSize = 0.26;
+  const postBottom = -2.90;
+  const postX = 0.58;
+  const drumClear = drumRadius + 0.05;
+  const postTop = drumY - Math.sqrt(drumClear * drumClear - postX * postX) - 0.02;
+  const postY = (postTop + postBottom) / 2;
+  const postH = postTop - postBottom;
+  for (const x of [-postX, postX]) {
+    for (const z of [0.02, 0.36]) {
+      addBox(frame, 'hub-post', postSize, postH, postSize, gold, x, postY, z);
+    }
   }
-  addBeam(frame, 'rear-crossbar', [-1.55, 0.95, -0.28], [1.55, 0.95, -0.28], 0.08, gold);
-  addCylinderZ(frame, 'axle-cap-left', 0.15, 0.12, brightGold, -1.58, drumY, 0.52, 24);
-  addCylinderZ(frame, 'axle-cap-right', 0.15, 0.12, brightGold, 1.58, drumY, 0.52, 24);
 
   // Five-column acrylic magazine. Tops of the columns line up; 49 balls leave one tube one ball short.
   const rack = new T.Group();
@@ -235,10 +258,16 @@ export function buildMachine(_THREE, root, materials) {
     rack.add(tube);
     if (column < 4) addBox(rack, 'magazine-divider', 0.016, rackHeight - 0.18, 0.03, brightGold, x + RACK_GAP_X / 2, rackMid, 0.30);
   }
-  const rackFace = new T.Mesh(new T.BoxGeometry(1.72, rackHeight - 0.12, 0.016), glass);
+  const rackGlass = glass.clone();
+  rackGlass.opacity = 0.04;
+  const rackFace = new T.Mesh(new T.BoxGeometry(1.72, rackHeight - 0.12, 0.012), rackGlass);
   rackFace.name = 'magazine-front-glass';
-  rackFace.position.set(0, rackMid, 0.32);
+  rackFace.position.set(0, rackMid, 0.34);
   rack.add(rackFace);
+  for (let bar = 0; bar < 9; bar++) {
+    const x = -0.76 + bar * 0.19;
+    addBox(rack, 'magazine-bar', 0.02, rackHeight - 0.22, 0.02, brightGold, x, rackMid, 0.38);
+  }
   addBox(frame, 'magazine-bridge', 1.28, 0.14, 0.58, gold, 0, 1.70, 0.04);
 
   // Transparent drum: thick gold front ring, clear wall, clear faces.
@@ -247,49 +276,63 @@ export function buildMachine(_THREE, root, materials) {
   drumWall.rotation.x = Math.PI / 2;
   drumWall.position.set(0, drumY, 0);
   frame.add(drumWall);
-  const glassZ = drumDepth / 2 - 0.012;
-  const glassRadius = drumRadius - 0.155;
+  const glassZ = drumDepth / 2 - 0.012 * drumScale;
+  const glassRadius = drumRadius - 0.155 * drumScale;
   const frontGlass = new T.Mesh(new T.CircleGeometry(glassRadius, 96), glass);
   frontGlass.name = 'drum-front-glass';
   frontGlass.position.set(0, drumY, glassZ);
   frame.add(frontGlass);
-  const backGlass = new T.Mesh(new T.CircleGeometry(drumRadius - 0.11, 96), glass);
+  const backGlass = new T.Mesh(new T.CircleGeometry(drumRadius - 0.11 * drumScale, 96), glass);
   backGlass.name = 'drum-back-glass';
   backGlass.position.set(0, drumY, -drumDepth / 2 + 0.02);
   backGlass.rotation.y = Math.PI;
   frame.add(backGlass);
-  addRing(frame, 'rear-rim', drumRadius, 0.09, -drumDepth / 2, gold, 96, drumY);
-  addRing(frame, 'front-rim', drumRadius, 0.135, drumDepth / 2, brightGold, 96, drumY);
-  addRing(frame, 'front-rim-inner', drumRadius - 0.18, 0.028, drumDepth / 2 + 0.012, gold, 96, drumY);
-  // Covers are children of the glass, in the glass plane, just inside the bezel.
-  const screwRadius = glassRadius - 0.055;
+  // Front and back rims stay, but finer than the blunt hoops.
+  const frontTube = 0.046;
+  const rearTube = 0.040;
+  addRing(frame, 'rear-rim', drumRadius, rearTube, -drumDepth / 2, gold, 96, drumY);
+  addRing(frame, 'front-rim', drumRadius, frontTube, drumDepth / 2, brightGold, 96, drumY);
+  addRing(frame, 'front-rim-inner', drumRadius - 0.07, 0.012, drumDepth / 2 + 0.006, gold, 96, drumY);
+  addRing(frame, 'rear-rim-inner', drumRadius - 0.07, 0.012, -drumDepth / 2 - 0.006, gold, 96, drumY);
   const screwCount = 18;
   for (let i = 0; i < screwCount; i++) {
     const a = -Math.PI / 2 + i * Math.PI * 2 / screwCount;
-    const cap = new T.Mesh(new T.SphereGeometry(0.032, 16, 10), brightGold);
-    cap.scale.z = 0.4;
-    cap.name = 'glass-screw-cover';
-    cap.position.set(Math.cos(a) * screwRadius, Math.sin(a) * screwRadius, 0.032 * 0.4);
-    frontGlass.add(cap);
+    const cap = new T.Mesh(new T.SphereGeometry(0.026, 16, 12), brightGold);
+    cap.name = 'rim-rivet';
+    cap.position.set(Math.cos(a) * drumRadius, drumY + Math.sin(a) * drumRadius, drumDepth / 2 + frontTube * 0.65);
+    frame.add(cap);
+  }
+  // Short pins bridging the front hoop to the back hoop, one at each spoke and one between.
+  const spacerCount = 12;
+  for (let i = 0; i < spacerCount; i++) {
+    const a = -Math.PI / 2 + i * Math.PI * 2 / spacerCount;
+    const x = Math.cos(a) * drumRadius;
+    const y = drumY + Math.sin(a) * drumRadius;
+    addBeam(frame, 'rim-spacer',
+      [x, y, -drumDepth / 2],
+      [x, y, drumDepth / 2],
+      0.018, brightGold, 8);
   }
 
   // Six flat spokes on a gold hub. The hub turns; the drum shell stays fixed.
   const rotor = new T.Group();
   rotor.name = 'six-spoke-hub';
-  rotor.position.set(0, drumY, 0.12);
+  rotor.position.set(0, drumY, 0.12 * drumScale);
   frame.add(rotor);
-  addCylinderZ(rotor, 'hub', 0.32, 0.22, gold, 0, 0, 0, 48);
-  addCylinderZ(rotor, 'hub-cap', 0.16, 0.26, brightGold, 0, 0, 0.02, 32);
+  addCylinderZ(rotor, 'hub', 0.18 * drumScale, 0.08 * drumScale, gold, 0, 0, 0, 48);
+  addCylinderZ(rotor, 'hub-cap', 0.09 * drumScale, 0.10 * drumScale, brightGold, 0, 0, 0.02 * drumScale, 32);
   for (let i = 0; i < 6; i++) {
     const angle = -Math.PI / 2 + i * Math.PI / 3;
-    const inner = 0.30, outer = 1.16;
-    addFlatBar(rotor, `spoke-${i + 1}`,
+    const inner = 0.16 * drumScale, barOuter = drumRadius - frontTube - 0.08;
+    addBeam(rotor, `spoke-${i + 1}`,
       [Math.cos(angle) * inner, Math.sin(angle) * inner, 0],
-      [Math.cos(angle) * outer, Math.sin(angle) * outer, 0],
-      0.125, 0.048, brightGold);
-    const tip = new T.Mesh(new T.SphereGeometry(0.068, 14, 10), gold);
-    tip.position.set(Math.cos(angle) * outer, Math.sin(angle) * outer, 0);
-    rotor.add(tip);
+      [Math.cos(angle) * barOuter, Math.sin(angle) * barOuter, 0],
+      0.022, brightGold);
+    // One flat board per spoke, just inside the rim, crosswise to the spoke.
+    const paddleR = drumRadius - frontTube - 0.28;
+    const paddle = addBox(rotor, `mixing-paddle-${i + 1}`, 0.16, 0.42, 0.03, brightGold,
+      Math.cos(angle) * paddleR, Math.sin(angle) * paddleR, 0.02);
+    paddle.rotation.z = angle;
   }
 
   // Mouth of the drum outlet. The clear guide tube is built once the tray floor is known.
@@ -304,6 +347,9 @@ export function buildMachine(_THREE, root, materials) {
   // Catch floor sits well below the drum exit. The trough stays in front of
   // the sphere, and its front face is flush with the pedestal. Local x=0 is the flat centre.
   tray.position.set(0, -2.82, 0);
+  // Whole lower trough and its glass, smaller against the drum and pedestal.
+  const trayScale = 0.80;
+  tray.scale.setScalar(trayScale);
   frame.add(tray);
 
   const woodGroove = new T.MeshStandardMaterial({ color: 0x3a3128, roughness: 0.6, metalness: 0.04 });
@@ -313,7 +359,7 @@ export function buildMachine(_THREE, root, materials) {
 
   const wallT = 0.10;
   const innerW = 0.56;
-  tray.position.z = baseFrontZ - innerW / 2;
+  tray.position.z = baseFrontZ - (innerW / 2) * trayScale;
   const zIn0 = -innerW / 2;
   const zIn1 = innerW / 2;
   const leftInner = -2.02;
@@ -329,11 +375,11 @@ export function buildMachine(_THREE, root, materials) {
   const rightEndY = peakY - slope * rightRun;
   // Inner face of the rear stop, in tray space. World z is the drum axis,
   // so the stem runs under the sphere to the bottom-centre exit.
-  const tunnelRear = -0.06 - tray.position.z;
+  const tunnelRear = (-0.06 - tray.position.z) / trayScale;
 
   // Clear pipe seated in the bottom outlet. It hangs downward only — the mouth
   // is flush with the inner drum floor so balls can still reach the hole.
-  const floorWorldY = tray.position.y + peakY;
+  const floorWorldY = tray.position.y + peakY * trayScale;
   const dropGap = BALL_D * 1.15;
   const tubeBottomY = floorWorldY + dropGap;
   const drumInnerBottom = drumY - (drumRadius - 0.08);
@@ -342,7 +388,8 @@ export function buildMachine(_THREE, root, materials) {
   selectorMouth.set(0, drumInnerBottom, tubeZ);
   const tubeRadius = BALL_R + 0.05;
   const dropTubeMat = (edgeGlass || glass).clone();
-  dropTubeMat.opacity = 0.45;
+  dropTubeMat.color = new T.Color(0xf6e2a8);
+  dropTubeMat.opacity = 0.38;
   dropTubeMat.transparent = true;
   dropTubeMat.depthWrite = false;
   dropTubeMat.side = T.DoubleSide;
@@ -354,7 +401,7 @@ export function buildMachine(_THREE, root, materials) {
   guide.position.set(0, (tubeTopY + tubeBottomY) / 2, tubeZ);
   frame.add(guide);
   const tubeRing = (y, name) => {
-    const ring = new T.Mesh(new T.TorusGeometry(tubeRadius, 0.016, 10, 28), brightGold);
+    const ring = new T.Mesh(new T.TorusGeometry(tubeRadius, 0.038, 10, 28), brightGold);
     ring.name = name;
     ring.rotation.x = Math.PI / 2;
     ring.position.set(0, y, tubeZ);
@@ -602,13 +649,52 @@ export function buildMachine(_THREE, root, materials) {
   const frontGlassRibbon = addRibbon('front-glass', glassBottom, glassTop, trayGlass);
   frontGlassRibbon.castShadow = false;
 
-  // Empty group so the old gate call has nothing visible to raise across the peak.
+  // Diverter for this V-tray. A gold leaf hangs from an axle at the right
+  // shoulder of the flat crown, between two fixed cheeks.
+  // Closed (rotation 0): the leaf stands in the mouth of the right slope, so
+  // a ball on the crown can only leave to the left.
+  // Open (positive Z rotation): the leaf swings up over the right slope and
+  // the right pocket is clear. Balls 1–6 keep it closed; ball 7 opens it.
+  const gateX = flatHalf - 0.02;
+  const gateZ = -0.05;
+  const leafH = 0.50;
+  const hingeY = peakY + 0.016 + leafH;
+  // Stops short of horizontal so the raised leaf clears the right end wall.
+  const openSwing = 1.22;
+  const cheekH = leafH + 0.05;
+  for (const z of [-0.255, 0.155]) {
+    addBox(tray, 'diverter-cheek', 0.05, cheekH, 0.045, darkGold,
+      gateX, peakY + cheekH / 2, z);
+  }
   const retainer = new T.Group();
   retainer.name = 'special-ball-retainer';
-  retainer.position.set(0, peakY, 0);
-  retainer.userData.baseY = peakY;
+  retainer.position.set(gateX, hingeY, gateZ);
+  retainer.userData.baseY = hingeY;
   retainer.userData.travel = 0;
+  retainer.userData.swing = openSwing;
   tray.add(retainer);
+  const axle = new T.Mesh(new T.CylinderGeometry(0.022, 0.022, 0.70, 16), brightGold);
+  axle.name = 'diverter-axle';
+  axle.rotation.x = Math.PI / 2;
+  axle.position.z = 0.06;
+  axle.castShadow = true;
+  retainer.add(axle);
+  const blade = new T.Mesh(new T.BoxGeometry(0.042, leafH, 0.30), darkGold);
+  blade.name = 'retainer-panel';
+  blade.position.set(0, -leafH / 2, 0);
+  blade.castShadow = true;
+  blade.receiveShadow = true;
+  retainer.add(blade);
+  const lever = new T.Mesh(new T.BoxGeometry(0.03, 0.16, 0.03), brightGold);
+  lever.name = 'diverter-lever';
+  lever.position.set(0, 0.08, 0.40);
+  lever.castShadow = true;
+  retainer.add(lever);
+  const knob = new T.Mesh(new T.SphereGeometry(0.028, 14, 12), brightGold);
+  knob.name = 'diverter-knob';
+  knob.position.set(0, 0.17, 0.40);
+  knob.castShadow = true;
+  retainer.add(knob);
 
   const samples = [
     { x: leftInner, y: endY },
@@ -638,7 +724,8 @@ export function buildMachine(_THREE, root, materials) {
   function pointOnFloor(x) {
     const y = floorTopY(x);
     const a = floorAngle(x);
-    return new T.Vector3(x - Math.sin(a) * BALL_R, y + Math.cos(a) * BALL_R, channelZ);
+    const ballLocal = BALL_R / trayScale;
+    return new T.Vector3(x - Math.sin(a) * ballLocal, y + Math.cos(a) * ballLocal, channelZ);
   }
 
   const mainRestX = [];
@@ -664,8 +751,8 @@ export function buildMachine(_THREE, root, materials) {
   const specialRoll = pathBetween(0, specialX);
 
   // Ball centre: straight down from the chute mouth onto the long track, then forward.
-  const landZ = tubeExit.z - tray.position.z;
-  const landLocal = new T.Vector3(0, peakY + 0.02 + BALL_R, landZ);
+  const landZ = (tubeExit.z - tray.position.z) / tray.scale.z;
+  const landLocal = new T.Vector3(0, peakY + 0.02 + BALL_R / trayScale, landZ);
   const chuteEnd = toWorld(landLocal);
   const peakRest = toWorld(pointOnFloor(0));
   const dropPath = [
