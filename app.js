@@ -36,9 +36,9 @@ let selectorMouth=null,selectorOcclusion=null,receiverEntryStart=null,receiverJu
 let mainResultSlot=null,specialResultSlot=null,diverterGatePivot=null;
 let diverterGateAngle=0,diverterGateTarget=0,diverterGateState='down',diverterGateTransition=null;
 let trayShotUntil=0,cameraHold=false,ballClose=null,snapCamera=false;
-let userOrbit=false,orbit=null,orbitDrag=null,pendingLineup=false,lineup=null,lineupLabel=null;
+let userOrbit=false,orbit=null,orbitDrag=null,pendingLineup=false,lineup=null,lineupLabel=null,revealComplete=false;
 const NORMAL_PICKUP_DURATION=3.6;
-const SPECIAL_PICKUP_DURATION=12;
+const SPECIAL_PICKUP_DURATION=3.6;
 const pickupStart=i=>quickActive?0.9+i*1.45:8+i*19;
 const DRAW_END=8+6*19+SPECIAL_PICKUP_DURATION;
 const timelineRate=()=>quickActive?1:rate;
@@ -142,7 +142,8 @@ function reset(){
  if(camera&&(view==='wide'||view==='auto')){camera.position.set(...WIDE_CAMERA_POS);cameraTarget.set(...WIDE_CAMERA_TARGET);camera.lookAt(cameraTarget);snapCamera=true;}
 }
 function finishRound(){
- if(!batchActive||phase!=='sorting'||!resultShotStable||!resultShotStableAt||performance.now()-resultShotStableAt<RESULT_SHOT_DWELL_MS)return;
+ if(!batchActive||phase!=='sorting'||!revealComplete)return;
+ revealComplete=false;
  qaEvent('result-shot-dwell-complete',{round:batchIndex+1,elapsed:performance.now()-resultShotStableAt});qaEvent('round-end',{round:batchIndex+1});const result={main:sortedMain(),extra:revealed[6],index:batchIndex+1};batchResults.push(result);addTicket({...result,order:revealed.slice()});clearCupBalls();resetMachine();batchIndex++;
  if(batchIndex<batchTotal){beginRound();return;}
  phase='done';batchActive=false;finishTickets();setStageStatus('本批已完成 · 球池已復位 · 各注結果保留在票券');setLiveDrawDisplay(false);$('entry-count').disabled=false;$('status').textContent=`${batchTotal} 注全部完成`;$('step').textContent='到下方按「揭曉」查看號碼';$('instruction').textContent='攪珠完成！機台已復位到完整 49 球池；按下方「揭曉」查看各注獨立票券。';$('start').disabled=false;setStartLabel();$('copy').disabled=false;$('summary').textContent=`已完成 ${batchTotal} 注，向下按鈕揭曉或一次複製全部；單式填寫只用每注六個正選。`;setMotor(0);setRolling(false);setEffectsActive(false);syncDrum();
@@ -251,7 +252,7 @@ function extraction(){
   extracting={b,index,start:pickupStart(index),duration,from:b.mesh.position.clone(),tubeLogged:false,rollLogged:false,gateRequested:false,sfx:{slot:false}};
   qaEvent('ball-selected',{round:batchIndex+1,index:index+1,n:b.n});
   ballClose=null;
-  $('status').textContent=index===6?'特別號在中央透明管稍停':'選中球落入鼓底中央透明管';
+  $('status').textContent=index===6?'特別號落入鼓底中央透明管':'選中球落入鼓底中央透明管';
   $('step').textContent=`第 ${index+1} / ${order.length} 顆`;nextIndex++;
  }
  if(!extracting)return;
@@ -287,31 +288,27 @@ function extraction(){
   }
   return;
  }
- // The special ball opens the gate, pauses in the centre tube, then rolls down the right slope once the leaf is clear.
+ // Same continuous fall-and-roll as balls 1–6. The gate starts opening with the
+ // selection, so it is clear before the ball reaches the right shoulder.
+ // The roll is driven only by this ball's own progress, never parked on the crown.
  if(!e.gateRequested){e.gateRequested=true;setDiverterGate(true);qaEvent('diverter-gate-open',{round:batchIndex+1,index:7,n:e.b.n});setStageStatus('活門打開，特別號轉入右側');}
- if(t<.06){e.b.mesh.visible=true;glide(e.from,drop[0],smooth(t/.06));}
- else if(t<.58){logTube();e.b.mesh.visible=true;glide(drop[0],drop[1],.62);p.y+=Math.sin((t-.06)*26)*.018;}
- else if(t<.72){
-  logTube();e.b.mesh.visible=true;
-  if(!e.rollLogged){e.rollLogged=true;qaEvent('special-ball-drops-to-peak',{round:batchIndex+1,index:7,n:e.b.n,gateState:diverterGateState});}
-  glide(drop[1],drop[2],smooth((t-.58)/.14));
- }
- else if(t<.84){logTube();e.b.mesh.visible=true;glide(drop[2],drop[3],smooth((t-.72)/.12));}
+ if(t<.14){e.b.mesh.visible=true;glide(e.from,drop[0],smooth(t/.14));p.y+=Math.sin(Math.PI*t/.14)*.08;}
+ else if(t<.28){logTube();e.b.mesh.visible=true;glide(drop[0],drop[1],smooth((t-.14)/.14));}
+ else if(t<.42){logTube();e.b.mesh.visible=true;glide(drop[1],drop[2],smooth((t-.28)/.14));}
+ else if(t<.56){logTube();e.b.mesh.visible=true;glide(drop[2],drop[3],smooth((t-.42)/.14));}
  else{
   logTube();e.b.mesh.visible=true;
-  if(diverterGateAngle<0.8)p.copy(drop[3]);
-  else{
-   const roll=machineModel.specialRoll,u=smooth(clamp01((t-.84)/.16));
-   const f=(roll.length-1)*u,i0=Math.min(roll.length-2,Math.floor(f));
-   glide(roll[i0],roll[Math.min(roll.length-1,i0+1)],f-i0);
-  }
+  const roll=machineModel.specialRoll,u=smooth(clamp01((t-.56)/.44));
+  const f=(roll.length-1)*u,i0=Math.min(roll.length-2,Math.floor(f));
+  glide(roll[i0],roll[Math.min(roll.length-1,i0+1)],f-i0);
+  if(!e.rollLogged){e.rollLogged=true;qaEvent('special-ball-drops-to-peak',{round:batchIndex+1,index:7,n:e.b.n,gateState:diverterGateState});}
  }
  if(t>=1){
   p.copy(machineModel.specialRest);e.b.state='drawn';e.b.mesh.visible=true;e.b.mesh.rotation.set(0,.4,0);
   if(!e.sfx.slot){e.sfx.slot=true;playImpact(.15,.54);}
   qaEvent('ball-in-cup',{round:batchIndex+1,index:7,n:e.b.n,color:colorOf(e.b.n),slot:'special',gateState:diverterGateState});
   qaEvent('special-ball-rolled-right',{round:batchIndex+1,index:7,n:e.b.n,drawOrder:7});
-  setStageStatus('特別號已沿右側短斜面停定');startBallClose(e.b.mesh);reveal(e.b.n,e.index);extracting=null;if(quickActive)finishQuickDraw();
+  setStageStatus('特別號已沿右側短斜面停定');startBallClose(e.b.mesh,true);reveal(e.b.n,e.index);extracting=null;if(quickActive)finishQuickDraw();
  }
 }
 const smooth=t=>t*t*(3-2*t);
@@ -341,16 +338,20 @@ function resetOfficialCamera(){
 }
 let realTime=0;
 const BALL_CLOSE_HOLD=1.6;
-const LINEUP_MOVE=0.7;
-const LINEUP_HOLD=3.2;
+const LINEUP_MOVE=0.65;
+const PAN_APPROACH=0.45;
+const PAN_HOLD=0.7;
+const PAN_TRAVEL=0.5;
+const PULL_TIME=0.6;
+const FRAME_HOLD=2.4;
 const LINEUP_CENTER=[0,-1.45,2.15];
-function startBallClose(mesh){if(view!=='wide'||!mesh)return;ballClose={mesh,start:realTime,hold:BALL_CLOSE_HOLD};}
+function startBallClose(mesh,force=false){if(!mesh||(!force&&view!=='wide'))return;ballClose={mesh,start:realTime,hold:BALL_CLOSE_HOLD};}
 function faceLineupBall(mesh){
  mesh.rotation.order='YXZ';
  mesh.rotation.set(Math.PI/4,Math.PI/4,0);
 }
 function clearLineup(){
- lineup=null;pendingLineup=false;snapCamera=true;
+ lineup=null;pendingLineup=false;revealComplete=false;ballClose=null;snapCamera=true;
  if(lineupLabel){root.remove(lineupLabel);lineupLabel.material.map?.dispose();lineupLabel.material.dispose();lineupLabel=null;}
  document.querySelectorAll('[data-view]:not([data-view="results"])').forEach(b=>b.disabled=false);
  const results=document.querySelector('[data-view="results"]');
@@ -405,11 +406,37 @@ function startLineup(){
  lineupLabel=makeLineupLabel();
  lineupLabel.position.set(slots.extra.position[0]-0.46,slots.extra.position[1]+0.34,slots.extra.position[2]);
  root.add(lineupLabel);
- lineup={t0:realTime,items,pose:lineupPose(slots),held:false,holdStart:0,done:false};
+ lineup={t0:realTime,items,pose:lineupPose(slots),stops:items.slice(0,6).map(item=>item.to.clone()),phase:'arrange',phaseStart:realTime};
  ballClose=null;cameraHold=false;
  applyLineupCamera();
  setStageStatus(`正選由小至大排好 · 特別號碼 ${String(special).padStart(2,'0')}`);
  $('status').textContent='六正選平排 · 特別號在下方';
+}
+function closeOnBall(point){
+ return {pos:[point.x,point.y+0.02,point.z+1.18],target:[point.x,point.y,point.z]};
+}
+function lerpPose(a,b,u){
+ return {
+  pos:a.pos.map((v,i)=>v+(b.pos[i]-v)*u),
+  target:a.target.map((v,i)=>v+(b.target[i]-v)*u)
+ };
+}
+function applyPose(pose){
+ camera.position.set(...pose.pos);
+ cameraTarget.set(...pose.target);
+ camera.lookAt(cameraTarget);
+}
+function panPose(t,stops,widePose){
+ if(t<PAN_APPROACH)return {done:false,pose:lerpPose(widePose,closeOnBall(stops[0]),smooth(t/PAN_APPROACH))};
+ let time=t-PAN_APPROACH;
+ for(let i=0;i<stops.length;i++){
+  if(time<PAN_HOLD)return {done:false,pose:closeOnBall(stops[i])};
+  time-=PAN_HOLD;
+  if(i===stops.length-1)return {done:true,pose:closeOnBall(stops[i])};
+  if(time<PAN_TRAVEL)return {done:false,pose:lerpPose(closeOnBall(stops[i]),closeOnBall(stops[i+1]),smooth(time/PAN_TRAVEL))};
+  time-=PAN_TRAVEL;
+ }
+ return {done:true,pose:closeOnBall(stops[stops.length-1])};
 }
 function finishLineupCamera(){
  lineup=null;pendingLineup=false;snapCamera=true;
@@ -426,17 +453,36 @@ function updateLineup(){
   item.mesh.position.lerpVectors(item.from,item.to,u);
   faceLineupBall(item.mesh);
  }
- applyLineupCamera();
- if(u>=1&&!lineup.held){
-  lineup.held=true;lineup.holdStart=realTime;
-  if(batchActive){resultShotStable=true;resultShotStableAt=0;pendingStableFrame={round:batchIndex+1,duration:age};}
+ if(lineup.phase==='arrange'){
+  applyLineupCamera();
+  if(u>=1){lineup.phase='pan';lineup.phaseStart=realTime;$('status').textContent='逐個近看號碼';}
+  return;
  }
- if(!lineup.held)return;
- if(batchActive)return;
- if(realTime-lineup.holdStart>=LINEUP_HOLD)finishLineupCamera();
+ if(lineupLabel)lineupLabel.visible=lineup.phase==='pull'||lineup.phase==='hold';
+ if(lineup.phase==='pan'){
+  const pan=panPose(realTime-lineup.phaseStart,lineup.stops,lineup.pose);
+  applyPose(pan.pose);
+  if(pan.done){lineup.phase='pull';lineup.phaseStart=realTime;lineup.fromPose=pan.pose;$('status').textContent='七顆號碼全覽';}
+  return;
+ }
+ if(lineup.phase==='pull'){
+  const k=smooth(Math.min(1,(realTime-lineup.phaseStart)/PULL_TIME));
+  applyPose(lerpPose(lineup.fromPose,lineup.pose,k));
+  if(k>=1){lineup.phase='hold';lineup.phaseStart=realTime;}
+  return;
+ }
+ applyLineupCamera();
+ if(realTime-lineup.phaseStart<FRAME_HOLD)return;
+ if(batchActive){if(!revealComplete){revealComplete=true;pendingStableFrame={round:batchIndex+1,duration:realTime-lineup.t0};}return;}
+ finishLineupCamera();
 }
 function updateCamera(dt){
- if(ballClose&&view==='wide'&&!cameraHold&&!resultShot){
+ if(pendingLineup&&!ballClose&&!lineup&&!cameraHold){
+  const specialBall=balls.find(b=>b.n===revealed[6]);
+  if(specialBall)startBallClose(specialBall.mesh,true);
+  else{pendingLineup=false;startLineup();return;}
+ }
+ if(ballClose&&!cameraHold&&!resultShot&&(view==='wide'||pendingLineup)){
   const age=realTime-ballClose.start;
   if(age<=ballClose.hold){
    const ball=ballClose.mesh.position,nudge=reducedMotion()?0:age;
