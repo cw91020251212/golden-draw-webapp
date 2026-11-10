@@ -1,6 +1,6 @@
 import * as THREE from './three.module.js';
 import { WIDE_CAMERA_POS, WIDE_CAMERA_TARGET } from './wide-camera.js?v=ref-shot-20';
-import { orbitFromOffset, orbitAround, nudgeOrbit } from './orbit-camera.js?v=ref-shot-28';
+import { orbitFromOffset, orbitAround, nudgeOrbit, startPointer, stepPointer, releaseIsTap, pinchScale } from './orbit-camera.js?v=one-finger-1';
 import { buildMachine, BALL_R } from './machine-model.js?v=ref-shot-27';
 import { lineupSlots } from './lineup.js?v=tv-reveal-1';
 import {CompatibleRenderer} from './compat.js?v=ref-shot-27';
@@ -637,28 +637,52 @@ document.addEventListener('ticket:revealed',revealCupTicket);$('start').addEvent
 $('entry-count').addEventListener('change',()=>{if(!batchActive&&!quickActive){setStartLabel();resetTickets(Number($('entry-count').value));}});
 // Pointer-down is the manual fast-start; pointer-up/click must not draw twice.
 $('orbit-reset')?.addEventListener('click',resetOfficialCamera);
+const scenePointers=new Map();
+function pointerPair(){return [...scenePointers.values()];}
+function beginOnePointer(id,x,y){orbitDrag={...startPointer(x,y),id,mode:'one'};}
 $('scene').addEventListener('pointerdown',e=>{
- if(e.pointerType==='touch'||e.button!==0)return;
- orbitDrag={type:'mouse',id:e.pointerId,x:e.clientX,y:e.clientY,moved:false};
+ if(e.pointerType==='mouse'&&e.button!==0)return;
+ scenePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(scenePointers.size===1)beginOnePointer(e.pointerId,e.clientX,e.clientY);
+ else if(scenePointers.size>=2){const [a,b]=pointerPair();orbitDrag={mode:'pinch',dist:Math.hypot(a.x-b.x,a.y-b.y)||1,moved:true};}
  try{$('scene').setPointerCapture(e.pointerId);}catch{}
 });
 $('scene').addEventListener('pointermove',e=>{
- if(!orbitDrag||orbitDrag.type!=='mouse'||e.pointerId!==orbitDrag.id)return;
- const dx=e.clientX-orbitDrag.x,dy=e.clientY-orbitDrag.y;
- if(!orbitDrag.moved&&Math.hypot(dx,dy)<5)return;
- orbitDrag.moved=true;
- if(cameraBusy()){orbitDrag.x=e.clientX;orbitDrag.y=e.clientY;return;}
- ensureUserOrbit();
- orbit=nudgeOrbit(orbit,dx,dy,1);
- orbitDrag.x=e.clientX;orbitDrag.y=e.clientY;
- applyUserOrbit();
+ if(!scenePointers.has(e.pointerId))return;
+ scenePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(!orbitDrag)return;
+ if(orbitDrag.mode==='one'&&e.pointerId===orbitDrag.id){
+  const next=stepPointer(orbitDrag,e.clientX,e.clientY);
+  orbitDrag={...next,id:orbitDrag.id,mode:'one'};
+  if(!next.moved)return;
+  if(cameraBusy()){orbitDrag.x=e.clientX;orbitDrag.y=e.clientY;orbitDrag.startX=e.clientX;orbitDrag.startY=e.clientY;return;}
+  ensureUserOrbit();
+  orbit=nudgeOrbit(orbit,next.dx,next.dy,1);
+  applyUserOrbit();
+ }else if(orbitDrag.mode==='pinch'&&scenePointers.size>=2){
+  const [a,b]=pointerPair();
+  const dist=Math.hypot(a.x-b.x,a.y-b.y)||1;
+  const scale=pinchScale(orbitDrag.dist,dist);
+  orbitDrag.dist=dist;
+  if(cameraBusy()||scale===1)return;
+  ensureUserOrbit();
+  orbit=nudgeOrbit(orbit,0,0,scale);
+  applyUserOrbit();
+ }
 });
-$('scene').addEventListener('pointerup',e=>{
- if(!orbitDrag||orbitDrag.type!=='mouse'||e.pointerId!==orbitDrag.id)return;
- const moved=orbitDrag.moved;orbitDrag=null;
- if(!moved)startFromDrum();
-});
-$('scene').addEventListener('pointercancel',e=>{if(orbitDrag&&e.pointerId===orbitDrag.id)orbitDrag=null;});
+function endScenePointer(id){
+ scenePointers.delete(id);
+ if(orbitDrag?.mode==='one'&&orbitDrag.id===id){
+  const tap=releaseIsTap(orbitDrag);
+  orbitDrag=null;
+  if(tap)startFromDrum();
+  return;
+ }
+ if(scenePointers.size===1){const [leftId,left]=[...scenePointers.entries()][0];beginOnePointer(leftId,left.x,left.y);orbitDrag.moved=true;}
+ else if(scenePointers.size===0)orbitDrag=null;
+}
+$('scene').addEventListener('pointerup',e=>endScenePointer(e.pointerId));
+$('scene').addEventListener('pointercancel',e=>endScenePointer(e.pointerId));
 $('scene').addEventListener('wheel',e=>{
  if(cameraBusy())return;
  e.preventDefault();
@@ -667,54 +691,6 @@ $('scene').addEventListener('wheel',e=>{
  orbit=nudgeOrbit(orbit,0,0,1/scale);
  applyUserOrbit();
 },{passive:false});
-function touchMid(list){
- let x=0,y=0;for(const t of list){x+=t.clientX;y+=t.clientY;}
- x/=list.length;y/=list.length;
- const a=list[0],b=list[1];
- return {x,y,dist:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)||1};
-}
-$('scene').addEventListener('touchstart',e=>{
- if(e.touches.length>=2){
-  e.preventDefault();
-  const mid=touchMid(e.touches);
-  orbitDrag={type:'touch',x:mid.x,y:mid.y,dist:mid.dist,moved:false};
- }else if(e.touches.length===1&&!(orbitDrag&&orbitDrag.type==='touch')){
-  const t=e.touches[0];
-  orbitDrag={type:'tap',x:t.clientX,y:t.clientY,moved:false};
- }
-},{passive:false});
-$('scene').addEventListener('touchmove',e=>{
- if(e.touches.length>=2){
-  e.preventDefault();
-  const mid=touchMid(e.touches);
-  if(!orbitDrag||orbitDrag.type!=='touch')orbitDrag={type:'touch',x:mid.x,y:mid.y,dist:mid.dist,moved:false};
-  const dx=mid.x-orbitDrag.x,dy=mid.y-orbitDrag.y,pinch=mid.dist/orbitDrag.dist;
-  if(cameraBusy()){orbitDrag.x=mid.x;orbitDrag.y=mid.y;orbitDrag.dist=mid.dist;return;}
-  ensureUserOrbit();
-  orbit=nudgeOrbit(orbit,dx,dy,pinch);
-  orbitDrag.x=mid.x;orbitDrag.y=mid.y;orbitDrag.dist=mid.dist;orbitDrag.moved=true;
-  applyUserOrbit();
- }else if(e.touches.length===1&&orbitDrag&&orbitDrag.type==='tap'){
-  const t=e.touches[0];
-  if(Math.hypot(t.clientX-orbitDrag.x,t.clientY-orbitDrag.y)>12)orbitDrag.moved=true;
- }
-},{passive:false});
-$('scene').addEventListener('touchend',e=>{
- if(e.touches.length>=2){
-  const mid=touchMid(e.touches);
-  orbitDrag={type:'touch',x:mid.x,y:mid.y,dist:mid.dist,moved:true};
-  return;
- }
- if(e.touches.length===1){
-  const t=e.touches[0];
-  orbitDrag={type:'tap',x:t.clientX,y:t.clientY,moved:true};
-  return;
- }
- const tap=orbitDrag&&orbitDrag.type==='tap'&&!orbitDrag.moved;
- orbitDrag=null;
- if(tap)startFromDrum();
-},{passive:false});
-$('scene').addEventListener('touchcancel',()=>{orbitDrag=null;});
 $('scene').addEventListener('click',e=>{if(e.detail===0)startFromDrum();});
 $('scene').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();if(!e.repeat)startFromDrum();}});
 $('copy').addEventListener('click',async()=>{if(!batchResults.length)return;const text=getTicketsCopyText()+'\n（隨機娛樂模擬，非開獎預測；特別號不是單式填寫號碼。）';const feedback=$('summary');feedback.classList.remove('copy-error');feedback.textContent='';try{await navigator.clipboard.writeText(text);$('copy').textContent='全部已複製 ✓';setTimeout(()=>$('copy').textContent='複製全部號碼 ↗',1800);}catch{feedback.textContent=text+' — 請長按選取複製。';feedback.classList.add('copy-error');}});

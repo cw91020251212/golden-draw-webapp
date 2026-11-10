@@ -9,6 +9,8 @@ export const ORBIT_MIN_PHI = 0.28;
 export const ORBIT_MAX_PHI = 1.42;
 export const ORBIT_YAW_PER_PX = 0.0055;
 export const ORBIT_PITCH_PER_PX = 0.0045;
+// Same dead-zone as the wooden-tower reference: a short press stays a tap.
+export const DRAG_THRESHOLD_PX = 7;
 
 export function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -53,4 +55,26 @@ export function nudgeOrbit(orbit, dx, dy, pinchScale = 1) {
     theta: orbit.theta - dx * ORBIT_YAW_PER_PX,
     phi: orbit.phi + dy * ORBIT_PITCH_PER_PX
   });
+}
+
+export function startPointer(x, y) {
+  return { x, y, startX: x, startY: y, moved: false, dx: 0, dy: 0 };
+}
+
+// One finger or the mouse. Past the threshold the same step rotates the view.
+export function stepPointer(state, x, y) {
+  const dx = x - state.x;
+  const dy = y - state.y;
+  const moved = state.moved || Math.hypot(x - state.startX, y - state.startY) >= DRAG_THRESHOLD_PX;
+  return { x, y, startX: state.startX, startY: state.startY, moved, dx: moved ? dx : 0, dy: moved ? dy : 0 };
+}
+
+export function releaseIsTap(state) {
+  return !state?.moved;
+}
+
+// Two-finger pinch. Scale is the new finger distance divided by the previous one.
+export function pinchScale(previousDistance, nextDistance) {
+  if (!previousDistance || !nextDistance) return 1;
+  return nextDistance / previousDistance;
 }

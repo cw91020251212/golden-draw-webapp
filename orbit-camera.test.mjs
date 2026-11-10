@@ -7,11 +7,16 @@ import {
   ORBIT_MIN_RADIUS,
   ORBIT_MAX_RADIUS,
   ORBIT_YAW_PER_PX,
+  DRAG_THRESHOLD_PX,
   orbitFromOffset,
   offsetFromOrbit,
   orbitAround,
   clampOrbit,
-  nudgeOrbit
+  nudgeOrbit,
+  startPointer,
+  stepPointer,
+  releaseIsTap,
+  pinchScale
 } from './orbit-camera.js';
 
 function offsetOf(position, target) {
@@ -34,6 +39,29 @@ test('half a turn from the official angle looks at the back of the drum', () => 
   const eye = orbitAround(WIDE_CAMERA_TARGET, turned);
   assert.ok(eye[2] < WIDE_CAMERA_TARGET[2], 'camera should stand on the back side of the target');
   assert.ok(eye[1] > WIDE_CAMERA_TARGET[1], 'the look-down elevation stays above the target');
+});
+
+test('one finger or the mouse orbits once the drag passes the tap threshold', () => {
+  const orbit = orbitFromOffset(offsetOf(WIDE_CAMERA_POS, WIDE_CAMERA_TARGET));
+  const nudge = stepPointer(startPointer(100, 80), 100 + DRAG_THRESHOLD_PX - 1, 80);
+  assert.equal(nudge.moved, false);
+  assert.equal(releaseIsTap(nudge), true);
+  assert.equal(nudge.dx, 0);
+  const drag = stepPointer(nudge, 100 + 80, 80);
+  assert.equal(drag.moved, true);
+  assert.equal(releaseIsTap(drag), false);
+  const turned = nudgeOrbit(orbit, drag.dx, drag.dy, 1);
+  assert.notEqual(turned.theta, orbit.theta);
+  assert.equal(turned.radius, orbit.radius);
+});
+
+test('two-finger pinch zooms and is not a tap', () => {
+  const orbit = orbitFromOffset(offsetOf(WIDE_CAMERA_POS, WIDE_CAMERA_TARGET));
+  assert.equal(pinchScale(120, 240), 2);
+  const closer = nudgeOrbit(orbit, 0, 0, pinchScale(120, 240));
+  assert.ok(closer.radius < orbit.radius);
+  assert.equal(closer.theta, orbit.theta);
+  assert.equal(releaseIsTap({ moved: true }), false);
 });
 
 test('pinch and pitch stay inside the limits', () => {
