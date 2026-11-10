@@ -177,27 +177,53 @@ export function buildMachine(_THREE, root, materials) {
   const drumRadius = 1.50 * drumScale;
   const drumDepth = 1.06 * drumScale;
 
-  // Wood pedestal, same grain as the tray, with the lotteries nameplate.
-  // Base stays under the drum, but reaches left to carry the long tray arm.
-  // Plinth dropped with the tray so the catch floor can sit under the drum ring.
-  const baseCenterZ = 0.62;
-  const baseDepth = 1.70;
-  const baseFrontZ = baseCenterZ + baseDepth / 2;
-  addBox(frame, 'lower-cabinet', 3.70, 0.36, baseDepth, woodWall, -0.42, -3.08, baseCenterZ);
-  addBox(frame, 'cabinet-top', 3.55, 0.04, 1.60, woodFloor, -0.42, -2.90, baseFrontZ - 0.80);
-  addBox(frame, 'cabinet-front-lip', 3.58, 0.05, 0.05, woodWall, -0.42, -2.92, baseFrontZ - 0.025);
-  const plate = new T.Mesh(new T.BoxGeometry(1.72, 0.26, 0.02), new T.MeshStandardMaterial({
-    map: nameplateTexture(), metalness: 0.55, roughness: 0.32, color: 0xf3d48a
+  // Stepped plinth in the proportions of the original pedestal: a thick block,
+  // a wider skirt, an inset front panel and a centred nameplate. The width
+  // follows this tray so both ends of the trough sit on the block, and the
+  // front face stays flush with the tray. The top is at y=-2.90, where the
+  // hub posts land.
+  const baseFrontZ = 1.47;
+  const baseDepth = 1.64;
+  const baseCenterZ = baseFrontZ - baseDepth / 2;
+  const baseCenterX = -0.48;
+  const baseWidth = 2.84;
+  const topY = -2.90;
+  const plinthCapH = 0.08;
+  const bodyH = 0.38;
+  const skirtH = 0.11;
+  const skirtBottom = topY - plinthCapH - bodyH - skirtH;
+  const bodyCenterY = skirtBottom + skirtH + bodyH / 2;
+  addBox(frame, 'cabinet-skirt', baseWidth + 0.14, skirtH, baseDepth + 0.08, darkGold,
+    baseCenterX, skirtBottom + skirtH / 2, baseCenterZ - 0.02);
+  addBox(frame, 'lower-cabinet', baseWidth, bodyH, baseDepth, gold,
+    baseCenterX, bodyCenterY, baseCenterZ);
+  addBox(frame, 'cabinet-top', baseWidth - 0.06, plinthCapH, baseDepth - 0.02, brightGold,
+    baseCenterX, topY - plinthCapH / 2, baseCenterZ);
+  addBox(frame, 'cabinet-front-panel', 2.16, 0.28, 0.028, darkGold,
+    baseCenterX, bodyCenterY, baseFrontZ + 0.012);
+  addBox(frame, 'cabinet-front-inset', 1.96, 0.20, 0.018, gold,
+    baseCenterX, bodyCenterY, baseFrontZ + 0.030);
+  const plate = new T.Mesh(new T.BoxGeometry(1.16, 0.15, 0.018), new T.MeshStandardMaterial({
+    map: nameplateTexture(), metalness: 0.45, roughness: 0.38, color: 0xf3d48a
   }));
   plate.name = 'hkjc-nameplate';
-  plate.position.set(0.02, -3.08, baseFrontZ + 0.01);
+  plate.position.set(baseCenterX, bodyCenterY, baseFrontZ + 0.046);
+  plate.castShadow = true;
   frame.add(plate);
-  for (const [x, z] of [[-1.95, 0.62], [1.15, 0.62], [-1.95, -0.15], [1.15, -0.15]]) {
-    addBox(frame, 'foot-stem', 0.14, 0.22, 0.14, gold, x, -3.38, z);
-    const foot = new T.Mesh(new T.CylinderGeometry(0.18, 0.21, 0.08, 28), brightGold);
-    foot.name = 'round-foot';
-    foot.position.set(x, -3.50, z);
-    frame.add(foot);
+  const footH = 0.07;
+  const footInsetX = baseWidth / 2 - 0.26;
+  const footInsetZ = baseDepth / 2 - 0.30;
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const x = baseCenterX + sx * footInsetX;
+      const z = baseCenterZ + sz * footInsetZ;
+      addBox(frame, 'foot-stem', 0.08, 0.04, 0.08, darkGold, x, skirtBottom - 0.02, z);
+      const foot = new T.Mesh(new T.CylinderGeometry(0.10, 0.12, footH, 24), brightGold);
+      foot.name = 'round-foot';
+      foot.position.set(x, skirtBottom - footH / 2, z);
+      foot.castShadow = true;
+      frame.add(foot);
+    }
   }
 
   // Four chunky vertical posts in a tight square under the hub.
@@ -623,13 +649,52 @@ export function buildMachine(_THREE, root, materials) {
   const frontGlassRibbon = addRibbon('front-glass', glassBottom, glassTop, trayGlass);
   frontGlassRibbon.castShadow = false;
 
-  // Empty group so the old gate call has nothing visible to raise across the peak.
+  // Diverter for this V-tray. A gold leaf hangs from an axle at the right
+  // shoulder of the flat crown, between two fixed cheeks.
+  // Closed (rotation 0): the leaf stands in the mouth of the right slope, so
+  // a ball on the crown can only leave to the left.
+  // Open (positive Z rotation): the leaf swings up over the right slope and
+  // the right pocket is clear. Balls 1–6 keep it closed; ball 7 opens it.
+  const gateX = flatHalf - 0.02;
+  const gateZ = -0.05;
+  const leafH = 0.50;
+  const hingeY = peakY + 0.016 + leafH;
+  // Stops short of horizontal so the raised leaf clears the right end wall.
+  const openSwing = 1.22;
+  const cheekH = leafH + 0.05;
+  for (const z of [-0.255, 0.155]) {
+    addBox(tray, 'diverter-cheek', 0.05, cheekH, 0.045, darkGold,
+      gateX, peakY + cheekH / 2, z);
+  }
   const retainer = new T.Group();
   retainer.name = 'special-ball-retainer';
-  retainer.position.set(0, peakY, 0);
-  retainer.userData.baseY = peakY;
+  retainer.position.set(gateX, hingeY, gateZ);
+  retainer.userData.baseY = hingeY;
   retainer.userData.travel = 0;
+  retainer.userData.swing = openSwing;
   tray.add(retainer);
+  const axle = new T.Mesh(new T.CylinderGeometry(0.022, 0.022, 0.70, 16), brightGold);
+  axle.name = 'diverter-axle';
+  axle.rotation.x = Math.PI / 2;
+  axle.position.z = 0.06;
+  axle.castShadow = true;
+  retainer.add(axle);
+  const blade = new T.Mesh(new T.BoxGeometry(0.042, leafH, 0.30), darkGold);
+  blade.name = 'retainer-panel';
+  blade.position.set(0, -leafH / 2, 0);
+  blade.castShadow = true;
+  blade.receiveShadow = true;
+  retainer.add(blade);
+  const lever = new T.Mesh(new T.BoxGeometry(0.03, 0.16, 0.03), brightGold);
+  lever.name = 'diverter-lever';
+  lever.position.set(0, 0.08, 0.40);
+  lever.castShadow = true;
+  retainer.add(lever);
+  const knob = new T.Mesh(new T.SphereGeometry(0.028, 14, 12), brightGold);
+  knob.name = 'diverter-knob';
+  knob.position.set(0, 0.17, 0.40);
+  knob.castShadow = true;
+  retainer.add(knob);
 
   const samples = [
     { x: leftInner, y: endY },
