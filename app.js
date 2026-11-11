@@ -2,6 +2,7 @@ import * as THREE from './three.module.js';
 import { WIDE_CAMERA_POS, WIDE_CAMERA_TARGET } from './wide-camera.js?v=ref-shot-20';
 import { orbitFromOffset, orbitAround, nudgeOrbit, startPointer, stepPointer, releaseIsTap, pinchScale } from './orbit-camera.js?v=one-finger-1';
 import { buildMachine, BALL_R } from './machine-model.js?v=ref-shot-27';
+import { MIX_OMEGA, stepDrumMix } from './drum-mix.js?v=mix-energy-1';
 import { lineupSlots } from './lineup.js?v=tv-reveal-1';
 import {CompatibleRenderer} from './compat.js?v=ref-shot-27';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
@@ -36,7 +37,7 @@ function startResultShot(){qaEvent('result-shot-start',{round:batchIndex+1,drawC
 function clearNumbers(){resetSort();numbers.innerHTML=Array.from({length:6},(_,i)=>`<div data-slot="${i}" class="number empty" aria-label="第 ${i+1} 個號碼尚未抽出">—</div>`).join('');$('extra').className='number empty';$('extra').textContent='＋';$('extra').setAttribute('aria-label','特別號碼尚未抽出');}
 clearNumbers();
 let renderer,scene,camera,root,rotor,balls=[],cupGroup,cupBallLayer,cupBallRecords=[],machineModel=null,clock=new THREE.Clock(),cameraTarget=new THREE.Vector3(0,1.1,0),mouseX=0,machineBounds=null,fitProbeCamera=null,machineFitVertices=null,fitCameraCache=new Map();
-const sphereGeo=new THREE.SphereGeometry(BALL_R,22,16),plainBallMaterial=new THREE.MeshStandardMaterial({color:0xf4eddb,roughness:.24,metalness:.04}),temp=new THREE.Vector3();
+const sphereGeo=new THREE.SphereGeometry(BALL_R,22,16),plainBallMaterial=new THREE.MeshStandardMaterial({color:0xf4eddb,roughness:.24,metalness:.04});
 let selectorMouth=null,selectorOcclusion=null,receiverEntryStart=null,receiverJunction=null,receiverEntryLane=null;
 let mainResultSlot=null,specialResultSlot=null,diverterGatePivot=null;
 let diverterGateAngle=0,diverterGateTarget=0,diverterGateState='down',diverterGateTransition=null;
@@ -47,9 +48,8 @@ const SPECIAL_PICKUP_DURATION=3.6;
 const pickupStart=i=>quickActive?0.9+i*1.45:8+i*19;
 const DRAW_END=8+6*19+SPECIAL_PICKUP_DURATION;
 const timelineRate=()=>quickActive?1:rate;
-// The supplied video shows clockwise mixing and no clear reversal; ease the speed only slightly at selection.
-const spinDirection=()=>-1;
-function motorSpeed(){return -3.45;}
+// Clockwise, about one turn a second, so the paddles fling the pile instead of nudging it.
+function motorSpeed(){return MIX_OMEGA;}
 
 function envTexture(){const c=document.createElement('canvas');c.width=1024;c.height=512;const g=c.getContext('2d');g.fillStyle='#c6a15a';g.fillRect(0,0,1024,512);const grad=g.createLinearGradient(0,0,0,512);grad.addColorStop(0,'#fff8e6');grad.addColorStop(.28,'#f0c86a');grad.addColorStop(.52,'#1c4658');grad.addColorStop(1,'#e2c078');g.fillStyle=grad;g.fillRect(0,0,1024,512);g.fillStyle='#fff3c4';g.fillRect(80,20,180,240);g.fillStyle='#ffe7a8';g.fillRect(560,40,90,300);g.fillStyle='#f6e2b0';g.fillRect(800,70,160,140);const t=new THREE.CanvasTexture(c);t.mapping=THREE.EquirectangularReflectionMapping;t.colorSpace=THREE.SRGBColorSpace;return t;}
 function ballTexture(n){const c=document.createElement('canvas');c.width=256;c.height=128;const g=c.getContext('2d');g.fillStyle=({red:'#cf292f',blue:'#226596',green:'#23834e'})[colorOf(n)];g.fillRect(0,0,256,128);for(let row=0;row<2;row++)for(let col=0;col<4;col++){const x=32+col*64,y=32+row*64;g.fillStyle='#fff4d1';g.beginPath();g.ellipse(x,y,23,21,0,0,Math.PI*2);g.fill();g.fillStyle='#3b3021';g.font='bold 24px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText(n,x,y+1);}const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;t.userData={number:n,color:colorOf(n)};return t;}
@@ -220,57 +220,30 @@ function reveal(n,i){
 function updateSorting(){if(batchActive&&phase==='sorting')finishRound();}
 
 function simulate(dt){
- const radius=1.385,centerY=.05,spin=spinDirection(elapsed);
+ const drum=[];
  for(const b of balls){
   if(b.state==='rack'&&elapsed>(b.n-1)*.032){b.state='fall';b.vel.set(Math.sin(b.n*12.71)*.22,-.1,Math.cos(b.n*8.17)*.34);}
-  if(b.state!=='fall'&&b.state!=='drum')continue;
-  const p=b.mesh.position;
-  b.vel.y-=8.8*dt;
-  if(b.state==='drum'){
-   const rx=p.x,ry=p.y-centerY;
-   b.vel.x+=(-ry*spin*1.7+Math.sin(elapsed*4.1+b.n*2.37)*.9)*dt;
-   b.vel.y+=(rx*spin*1.7+Math.sin(elapsed*3.4+b.n*1.31)*.65)*dt;
-   b.vel.z+=Math.sin(elapsed*3+b.n*1.73)*1.15*dt;
-   const blade=Math.cos((Math.atan2(ry,rx)-rotor.rotation.z)*6);
-   if(p.y<-.52&&elapsed>(b.nextKick||0)&&blade>-.15){
-    b.vel.y=Math.max(b.vel.y,2.35+.55*(.5+.5*Math.sin(b.n*2.71+elapsed*5)));
-    b.vel.x+=Math.sin(b.n+elapsed*3)*.35;b.vel.z+=Math.cos(b.n+elapsed*2)*.24;
-    b.nextKick=elapsed+.48+(b.n%5)*.065;
-   }
-  }
-  b.vel.y=Math.min(3.3,b.vel.y);
-  const speed=b.vel.length();if(speed>4.6)b.vel.multiplyScalar(4.6/speed);
-  p.addScaledVector(b.vel,dt);
-  if(b.state==='fall'&&p.y<1.30){b.state='drum';playImpact(.19,.72);}
-  if(b.state==='drum'){
-   const radial=new THREE.Vector3(p.x,p.y-centerY,p.z),distance=radial.length();
-   if(distance>radius){
-    radial.normalize();p.copy(radial).multiplyScalar(radius);p.y+=centerY;
-    const normalSpeed=b.vel.dot(radial);
-    if(normalSpeed>0){b.vel.addScaledVector(radial,-1.58*normalSpeed);collisionSound(normalSpeed,.68);}
-   }
-  }
-  if(b.state==='drum'){
-   const depthLimit=machineModel.drumHalfDepth-BALL_R;
-   if(p.z>depthLimit){p.z=depthLimit;if(b.vel.z>0)b.vel.z*=-.62;}
-   else if(p.z<-depthLimit){p.z=-depthLimit;if(b.vel.z<0)b.vel.z*=-.62;}
-  }
-  b.vel.multiplyScalar(Math.pow(.994,dt*60));
-  b.mesh.rotation.x+=b.vel.y*dt*2;b.mesh.rotation.z-=b.vel.x*dt*2;
+  if(b.state==='fall'){
+   const p=b.mesh.position;
+   b.vel.y-=8.8*dt;
+   b.vel.y=Math.min(3.3,b.vel.y);
+   const speed=b.vel.length();if(speed>4.6)b.vel.multiplyScalar(4.6/speed);
+   p.addScaledVector(b.vel,dt);
+   b.vel.multiplyScalar(Math.pow(.994,dt*60));
+   b.mesh.rotation.x+=b.vel.y*dt*2;b.mesh.rotation.z-=b.vel.x*dt*2;
+   if(p.y<1.30){b.state='drum';playImpact(.19,.72);drum.push(b);}
+  }else if(b.state==='drum') drum.push(b);
  }
- for(let i=0;i<balls.length;i++){
-  const a=balls[i];if(a.state!=='drum')continue;
-  for(let j=i+1;j<balls.length;j++){
-   const b=balls[j];if(b.state!=='drum')continue;
-   temp.subVectors(a.mesh.position,b.mesh.position);const d=temp.length();
-   if(d<BALL_R*2&&d>.00001){
-    temp.multiplyScalar(1/d);const overlap=(BALL_R*2-d)*.5;
-    a.mesh.position.addScaledVector(temp,overlap);b.mesh.position.addScaledVector(temp,-overlap);
-    const rel=a.vel.clone().sub(b.vel).dot(temp);
-    if(rel<0){a.vel.addScaledVector(temp,-rel*.66);b.vel.addScaledVector(temp,rel*.66);collisionSound(-rel,.55);}
-   }
-  }
- }
+ if(!drum.length)return;
+ const bodies=drum.map(b=>({n:b.n,x:b.mesh.position.x,y:b.mesh.position.y,z:b.mesh.position.z,vx:b.vel.x,vy:b.vel.y,vz:b.vel.z,armed:!!b.armed,rest:b.rest||0}));
+ stepDrumMix(bodies,dt,{elapsed,rotorZ:rotor.rotation.z,depthLimit:machineModel.drumHalfDepth-BALL_R,onWall:s=>collisionSound(s,.68),onBall:s=>collisionSound(s,.55)});
+ drum.forEach((b,i)=>{
+  const s=bodies[i];
+  b.mesh.position.set(s.x,s.y,s.z);
+  b.vel.set(s.vx,s.vy,s.vz);
+  b.armed=s.armed;b.rest=s.rest;
+  b.mesh.rotation.x+=s.vy*dt*2;b.mesh.rotation.z-=s.vx*dt*2;
+ });
 }
 function extraction(){
  if(!extracting&&nextIndex<order.length&&elapsed>=pickupStart(nextIndex)){
@@ -722,6 +695,7 @@ if(qaActive){window.__goldenDrawPreviewBall=(drift=0)=>{window.__goldenDrawShowF
 if(qaActive){window.__goldenDrawLayout=()=>{const rests=machineModel.mainRests.map(p=>p.toArray()),special=machineModel.specialRest.toArray(),drop=machineModel.dropPath.map(p=>p.toArray());const left=rests[0],near=rests[5];const pitch=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;const centre=drop[3],spec=special;return{tubeExit:drop[1],landing:drop[2],centre,verticalDrop:drop[1][1]-drop[2][1],forwardRun:centre[2]-drop[2][2],rests,special,leftPitch:pitch(left,near),rightPitch:pitch(centre,spec),tray:machineModel.receiverEntryLane.position.toArray()};};window.__goldenDrawShowFinished=()=>{const nums=[8,15,23,31,42,47,7];balls.forEach(b=>{const i=nums.indexOf(b.n);if(i<0){b.mesh.visible=false;return;}b.mesh.visible=true;b.mesh.position.copy(i<6?machineModel.mainRests[i]:machineModel.specialRest);b.state='drawn';});renderer.render(scene,camera,true);};window.__goldenDrawGate=(open)=>{diverterGateAngle=open?1:0;diverterGateTarget=diverterGateAngle;diverterGateTransition=null;diverterGateState=open?'up':'down';applyRetainer();cameraHold=true;const blade=diverterGatePivot.getObjectByName('retainer-panel');blade.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(blade);const c=box.getCenter(new THREE.Vector3());camera.position.set(c.x+1.15,c.y+0.85,c.z+1.55);cameraTarget.copy(c);camera.lookAt(cameraTarget);renderer.render(scene,camera,true);return{state:diverterGateState,angle:diverterGateAngle,rotZ:diverterGatePivot.rotation.z,center:c.toArray(),size:box.getSize(new THREE.Vector3()).toArray()};};
 window.__goldenDrawSpecialClose=()=>{const nums=[39,1,44,49,27,6,36];revealed=nums.slice();balls.forEach(b=>{const i=nums.indexOf(b.n);if(i<0){b.mesh.visible=false;return;}showCupBall(b);b.mesh.visible=true;b.state='drawn';b.mesh.position.copy(i<6?machineModel.mainRests[i]:machineModel.specialRest);});view='wide';cameraHold=false;resultShot=null;pendingLineup=false;lineup=null;const mesh=balls.find(b=>b.n===36).mesh;startBallClose(mesh);const ball=mesh.position;camera.position.set(ball.x,ball.y+0.16,ball.z+0.92);cameraTarget.copy(ball);camera.lookAt(cameraTarget);renderer.render(scene,camera,true);return{close:!!ballClose,hold:ballClose&&ballClose.hold,pos:camera.position.toArray(),target:cameraTarget.toArray(),ball:ball.toArray()};};
 window.__goldenDrawLineup=()=>{revealed=[39,1,44,49,27,6,36];balls.forEach(b=>{const i=revealed.indexOf(b.n);if(i<0){b.mesh.visible=false;return;}showCupBall(b);b.mesh.visible=true;b.state='drawn';b.mesh.position.copy(i<6?machineModel.mainRests[i]:machineModel.specialRest);});cameraHold=false;resultShot=null;pendingLineup=false;startLineup();lineup.t0=realTime-LINEUP_MOVE;updateLineup();renderer.render(scene,camera,true);const placed=lineup.items.map(item=>({n:balls.find(b=>b.mesh===item.mesh).n,y:item.mesh.position.y,x:item.mesh.position.x}));return{cam:camera.position.toArray(),target:cameraTarget.toArray(),flat:placed};};
-window.__goldenDrawDigitCard=()=>{window.__goldenDrawLineup();lineup.phase='hold';lineup.phaseStart=realTime;showTvDigits('frame',revealed[6]);applyLineupCamera();renderer.render(scene,camera,true);return{mains:document.querySelector('#tv-main').innerText,extra:document.querySelector('#tv-extra').innerText};};}
+window.__goldenDrawDigitCard=()=>{window.__goldenDrawLineup();lineup.phase='hold';lineup.phaseStart=realTime;showTvDigits('frame',revealed[6]);applyLineupCamera();renderer.render(scene,camera,true);return{mains:document.querySelector('#tv-main').innerText,extra:document.querySelector('#tv-extra').innerText};};
+window.__goldenDrawMix=()=>{const mid=0.16;let above=0,slow=0,maxY=-Infinity,minY=Infinity;const drum=balls.filter(b=>b.state==='drum');for(const b of drum){const y=b.mesh.position.y,s=b.vel.length();if(y>mid)above++;if(s<0.45&&y<-0.65)slow++;if(y>maxY)maxY=y;if(y<minY)minY=y;}return{drum:drum.length,above,below:drum.length-above,slow,maxY,minY,elapsed};};}
 const shareButton=document.getElementById('share-app');
 shareButton?.addEventListener('click',async()=>{const shareData={title:document.title,text:'金球時光｜3D 攪珠遊戲（純粹娛樂模擬，非開獎預測）',url:location.href};try{if(navigator.share&&(!navigator.canShare||navigator.canShare(shareData))){await navigator.share(shareData);return;}await navigator.clipboard.writeText(shareData.url);shareButton.textContent='已複製連結';setTimeout(()=>shareButton.textContent='分享',1800);}catch(error){if(error.name!=='AbortError'){window.prompt('複製以下連結分享：',shareData.url);}}});
