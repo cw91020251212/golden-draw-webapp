@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BALL_RADIUS, MIX_OMEGA, drumMidY, stepDrumMix } from './drum-mix.js';
+import { BALL_RADIUS, MIX_OMEGA, drumMidY, readDrumBody, stepRebuiltDrumMix, writeDrumBody } from './drum-mix.js';
 
 function pack() {
   const balls = [];
@@ -27,7 +27,7 @@ function runMix(seconds) {
   let elapsed = 0;
   for (let k = 0; k < seconds / dt; k++) {
     elapsed += dt;
-    stepDrumMix(balls, dt, { elapsed, rotorZ: elapsed * MIX_OMEGA, depthLimit: 0.44 });
+    stepRebuiltDrumMix(balls, dt, { elapsed, rotorZ: elapsed * MIX_OMEGA, depthLimit: 0.44 });
     for (const b of balls) {
       b.maxY = Math.max(b.maxY, b.y);
       if (elapsed > 1.3) b.minY = Math.min(b.minY, b.y);
@@ -46,8 +46,17 @@ function runMix(seconds) {
   return { balls, samples };
 }
 
+test('the live frame rebuild keeps the paddle cooldown', () => {
+  const ball = { n: 7, x: 0, y: -1.1, z: 0, vx: 0.2, vy: 1, vz: 0, armed: true, rest: 0.2, nextKick: 3.4 };
+  const body = readDrumBody(ball);
+  const back = { n: 7 };
+  writeDrumBody(back, body);
+  assert.equal(back.nextKick, 3.4);
+  assert.equal(back.rest, 0.2);
+});
+
 test('jumps clear the midline, then fall back into a moving lower pile', () => {
-  const { balls, samples } = runMix(5.5);
+  const { balls, samples } = runMix(16);
   assert.equal(balls.length, 49);
   const mid = drumMidY();
   const peaks = balls.map(b => b.maxY);

@@ -53,7 +53,38 @@ function contain(b, radius, centerY, depthLimit) {
   return 0;
 }
 
-// balls: {n,x,y,z,vx,vy,vz,armed,rest}
+// The live app rebuilds a plain body every frame. nextKick has to travel
+// with that body, or the paddle cooldown is zero and the whole pile is scooped.
+export function readDrumBody(ball) {
+  return {
+    n: ball.n,
+    x: ball.x, y: ball.y, z: ball.z,
+    vx: ball.vx, vy: ball.vy, vz: ball.vz,
+    armed: !!ball.armed,
+    rest: ball.rest || 0,
+    nextKick: ball.nextKick || 0
+  };
+}
+
+export function writeDrumBody(ball, body) {
+  ball.x = body.x;
+  ball.y = body.y;
+  ball.z = body.z;
+  ball.vx = body.vx;
+  ball.vy = body.vy;
+  ball.vz = body.vz;
+  ball.armed = !!body.armed;
+  ball.rest = body.rest || 0;
+  ball.nextKick = body.nextKick || 0;
+}
+
+export function stepRebuiltDrumMix(balls, dt, ctx) {
+  const bodies = balls.map(readDrumBody);
+  stepDrumMix(bodies, dt, ctx);
+  balls.forEach((ball, i) => writeDrumBody(ball, bodies[i]));
+}
+
+// balls: {n,x,y,z,vx,vy,vz,armed,rest,nextKick}
 export function stepDrumMix(balls, dt, { elapsed, rotorZ, depthLimit, onWall, onBall } = {}) {
   const hubY = DRUM_HUB_Y;
   const centerY = DRUM_CENTER_Y;

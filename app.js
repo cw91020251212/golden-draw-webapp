@@ -2,7 +2,7 @@ import * as THREE from './three.module.js';
 import { WIDE_CAMERA_POS, WIDE_CAMERA_TARGET } from './wide-camera.js?v=ref-shot-20';
 import { orbitFromOffset, orbitAround, nudgeOrbit, startPointer, stepPointer, releaseIsTap, pinchScale } from './orbit-camera.js?v=one-finger-1';
 import { buildMachine, BALL_R } from './machine-model.js?v=ref-shot-27';
-import { MIX_OMEGA, stepDrumMix } from './drum-mix.js?v=mix-pile-1';
+import { MIX_OMEGA, stepDrumMix, readDrumBody } from './drum-mix.js?v=mix-pile-2';
 import { START_HINT_KEY, START_HINT_LABEL, shouldShowStartHint, startHintStoredValue } from './start-hint.js?v=start-hint-1';
 import { lineupSlots } from './lineup.js?v=tv-reveal-1';
 import {CompatibleRenderer} from './compat.js?v=ref-shot-27';
@@ -240,13 +240,13 @@ function simulate(dt){
   }else if(b.state==='drum') drum.push(b);
  }
  if(!drum.length)return;
- const bodies=drum.map(b=>({n:b.n,x:b.mesh.position.x,y:b.mesh.position.y,z:b.mesh.position.z,vx:b.vel.x,vy:b.vel.y,vz:b.vel.z,armed:!!b.armed,rest:b.rest||0}));
+ const bodies=drum.map(b=>readDrumBody({n:b.n,x:b.mesh.position.x,y:b.mesh.position.y,z:b.mesh.position.z,vx:b.vel.x,vy:b.vel.y,vz:b.vel.z,armed:b.armed,rest:b.rest,nextKick:b.nextKick}));
  stepDrumMix(bodies,dt,{elapsed,rotorZ:rotor.rotation.z,depthLimit:machineModel.drumHalfDepth-BALL_R,onWall:s=>collisionSound(s,.68),onBall:s=>collisionSound(s,.55)});
  drum.forEach((b,i)=>{
   const s=bodies[i];
   b.mesh.position.set(s.x,s.y,s.z);
   b.vel.set(s.vx,s.vy,s.vz);
-  b.armed=s.armed;b.rest=s.rest;
+  b.armed=s.armed;b.rest=s.rest;b.nextKick=s.nextKick;
   b.mesh.rotation.x+=s.vy*dt*2;b.mesh.rotation.z-=s.vx*dt*2;
  });
 }
@@ -702,6 +702,8 @@ if(qaActive){window.__goldenDrawLayout=()=>{const rests=machineModel.mainRests.m
 window.__goldenDrawSpecialClose=()=>{const nums=[39,1,44,49,27,6,36];revealed=nums.slice();balls.forEach(b=>{const i=nums.indexOf(b.n);if(i<0){b.mesh.visible=false;return;}showCupBall(b);b.mesh.visible=true;b.state='drawn';b.mesh.position.copy(i<6?machineModel.mainRests[i]:machineModel.specialRest);});view='wide';cameraHold=false;resultShot=null;pendingLineup=false;lineup=null;const mesh=balls.find(b=>b.n===36).mesh;startBallClose(mesh);const ball=mesh.position;camera.position.set(ball.x,ball.y+0.16,ball.z+0.92);cameraTarget.copy(ball);camera.lookAt(cameraTarget);renderer.render(scene,camera,true);return{close:!!ballClose,hold:ballClose&&ballClose.hold,pos:camera.position.toArray(),target:cameraTarget.toArray(),ball:ball.toArray()};};
 window.__goldenDrawLineup=()=>{revealed=[39,1,44,49,27,6,36];balls.forEach(b=>{const i=revealed.indexOf(b.n);if(i<0){b.mesh.visible=false;return;}showCupBall(b);b.mesh.visible=true;b.state='drawn';b.mesh.position.copy(i<6?machineModel.mainRests[i]:machineModel.specialRest);});cameraHold=false;resultShot=null;pendingLineup=false;startLineup();lineup.t0=realTime-LINEUP_MOVE;updateLineup();renderer.render(scene,camera,true);const placed=lineup.items.map(item=>({n:balls.find(b=>b.mesh===item.mesh).n,y:item.mesh.position.y,x:item.mesh.position.x}));return{cam:camera.position.toArray(),target:cameraTarget.toArray(),flat:placed};};
 window.__goldenDrawDigitCard=()=>{window.__goldenDrawLineup();lineup.phase='hold';lineup.phaseStart=realTime;showTvDigits('frame',revealed[6]);applyLineupCamera();renderer.render(scene,camera,true);return{mains:document.querySelector('#tv-main').innerText,extra:document.querySelector('#tv-extra').innerText};};
-window.__goldenDrawMix=()=>{const mid=0.16;let above=0,slow=0,maxY=-Infinity,minY=Infinity;const drum=balls.filter(b=>b.state==='drum');for(const b of drum){const y=b.mesh.position.y,s=b.vel.length();if(y>mid)above++;if(s<0.45&&y<-0.65)slow++;if(y>maxY)maxY=y;if(y<minY)minY=y;}return{drum:drum.length,above,below:drum.length-above,slow,maxY,minY,elapsed};};}
+window.__goldenDrawMix=()=>{const mid=0.16;let above=0,bowl=0,slow=0,maxY=-Infinity,minY=Infinity;const drum=balls.filter(b=>b.state==='drum');for(const b of drum){const y=b.mesh.position.y,s=b.vel.length();if(y>mid)above++;if(y<-0.7)bowl++;if(s<0.45&&y<-0.65)slow++;if(y>maxY)maxY=y;if(y<minY)minY=y;}return{drum:drum.length,above,below:drum.length-above,bowl,slow,maxY,minY,elapsed};};
+window.__goldenDrawHoldWide=()=>{ballClose=null;lineup=null;pendingLineup=false;cameraHold=true;camera.position.set(...WIDE_CAMERA_POS);cameraTarget.set(...WIDE_CAMERA_TARGET);camera.lookAt(cameraTarget);};
+window.__goldenDrawStepMix=(frames=1)=>{paused=true;const dt=1/60;for(let i=0;i<frames;i++){elapsed+=dt;extraction();simulate(dt);rotor.rotation.z+=dt*motorSpeed();}window.__goldenDrawHoldWide();renderer.render(scene,camera,true);return window.__goldenDrawMix();};}
 const shareButton=document.getElementById('share-app');
 shareButton?.addEventListener('click',async()=>{const shareData={title:document.title,text:'金球時光｜3D 攪珠遊戲（純粹娛樂模擬，非開獎預測）',url:location.href};try{if(navigator.share&&(!navigator.canShare||navigator.canShare(shareData))){await navigator.share(shareData);return;}await navigator.clipboard.writeText(shareData.url);shareButton.textContent='已複製連結';setTimeout(()=>shareButton.textContent='分享',1800);}catch(error){if(error.name!=='AbortError'){window.prompt('複製以下連結分享：',shareData.url);}}});
