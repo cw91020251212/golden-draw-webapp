@@ -4,12 +4,13 @@
 export const DRUM_RADIUS = 1.385;
 export const DRUM_CENTER_Y = 0.05;
 export const DRUM_HUB_Y = 0.16;
-export const DRUM_GRAVITY = 8.8;
+export const DRUM_GRAVITY = 12;
 export const MIX_OMEGA = -7.2;
 export const MIX_SPEED_CAP = 8.6;
 export const BALL_RADIUS = 0.13;
 
-const PADDLE_WINDOW = 0.32;
+const PADDLE_WINDOW = 0.22;
+const SCOOP_Y = -0.7;
 
 export function drumMidY() {
   return DRUM_HUB_Y;
@@ -30,14 +31,22 @@ function contain(b, radius, centerY, depthLimit) {
     b.x = nx * radius;
     b.y = centerY + ny * radius;
     b.z = nz * radius;
-    const vn = b.vx * nx + b.vy * ny + b.vz * nz;
+    let vn = b.vx * nx + b.vy * ny + b.vz * nz;
+    const outward = Math.max(0, vn);
     if (vn > 0) {
-      const bounce = 1.42;
+      const bounce = 1.35;
       b.vx -= bounce * vn * nx;
       b.vy -= bounce * vn * ny;
       b.vz -= bounce * vn * nz;
-      return vn;
+      vn = b.vx * nx + b.vy * ny + b.vz * nz;
     }
+    // Glass contact should knock the ball back into the drum, not let it
+    // skate around the rim and leave the floor empty.
+    const tx = b.vx - vn * nx, ty = b.vy - vn * ny, tz = b.vz - vn * nz;
+    b.vx -= tx * 0.28;
+    b.vy -= ty * 0.28;
+    b.vz -= tz * 0.28;
+    return outward;
   }
   if (b.z > depthLimit) { b.z = depthLimit; if (b.vz > 0) b.vz *= -0.72; }
   else if (b.z < -depthLimit) { b.z = -depthLimit; if (b.vz < 0) b.vz *= -0.72; }
@@ -61,39 +70,35 @@ export function stepDrumMix(balls, dt, { elapsed, rotorZ, depthLimit, onWall, on
     let rel = ang - rotorZ + Math.PI / 2;
     const sector = Math.PI / 3;
     rel -= Math.round(rel / sector) * sector;
-    // Scoop only in the lower bowl. Balls in the air finish their arc and fall
-    // back, instead of being relaunched the moment they cross the midline.
-    const hit = Math.abs(rel) < PADDLE_WINDOW && b.y < -0.32;
-    if (hit && !b.armed) {
-      const depth = Math.max(0, Math.min(1, (hubY - b.y) / (hubY - floorY)));
-      const vary = 0.78 + 0.44 * hash(b.n, elapsed);
-      const tx = dir * ry, ty = -dir * rx;
-      const tlen = Math.hypot(tx, ty) || 1;
-      const shove = (3.4 + 2.6 * depth) * vary;
-      b.vx += (tx / tlen) * shove;
-      b.vy += (ty / tlen) * shove * 0.45;
-      const lift = (5.45 + 2.15 * depth) * vary;
+    // A paddle only scoops balls that have fallen back into the bottom pile,
+    // and not on every pass. Airborne balls finish the arc, hit the glass,
+    // or drop somewhere else in the bowl.
+    const hit = Math.abs(rel) < PADDLE_WINDOW && b.y < SCOOP_Y && elapsed >= (b.nextKick || 0);
+    if (hit) {
+      const depth = Math.max(0, Math.min(1, (SCOOP_Y - b.y) / (SCOOP_Y - floorY)));
+      const vary = 0.62 + 0.7 * hash(b.n, elapsed);
+      const tx = dir * ry;
+      const tlen = Math.hypot(tx, b.x) || 1;
+      const lift = (6.3 + 1.8 * vary) * (0.94 + 0.06 * depth);
       if (b.vy < lift) b.vy = lift;
-      b.vz += (hash(b.n + 3, elapsed) - 0.5) * 3.4;
+      b.vx += (hash(b.n + 1, elapsed) - 0.5) * 2.8 + (tx / tlen) * 0.4;
+      b.vz += (hash(b.n + 3, elapsed) - 0.5) * 2.4;
+      b.nextKick = elapsed + 0.95 + 0.55 * hash(b.n + 9, elapsed);
     }
     b.armed = !!hit;
 
-    const drive = 12 * Math.max(0, (-0.05 - b.y) / 1.25);
-    const tx = dir * ry, ty = -dir * rx;
-    const tlen = Math.hypot(tx, ty) || 1;
-    b.vx += (tx / tlen) * drive * dt;
-    b.vy += (ty / tlen) * drive * dt;
-    b.vz += Math.sin(elapsed * 2.4 + b.n * 1.31) * 2.4 * dt;
+    if (b.y < SCOOP_Y) {
+      b.vz += Math.sin(elapsed * 2.2 + b.n * 1.31) * 0.8 * dt;
+    }
 
     const speed = Math.hypot(b.vx, b.vy, b.vz);
-    if (speed < 0.55 && b.y < -0.65) b.rest = (b.rest || 0) + dt;
+    if (speed < 0.32 && b.y < -1.0) b.rest = (b.rest || 0) + dt;
     else b.rest = 0;
-    if ((b.rest || 0) > 0.16) {
-      const depth = Math.max(0, Math.min(1, (hubY - b.y) / (hubY - floorY)));
-      const vary = 0.88 + 0.28 * hash(b.n, elapsed + 1.7);
-      b.vy = Math.max(b.vy, (5.6 + 1.8 * depth) * vary);
-      b.vx += Math.sin(b.n * 1.7 + elapsed) * 2.2;
-      b.vz += Math.cos(b.n * 0.9) * 1.5;
+    if ((b.rest || 0) > 0.28) {
+      const vary = hash(b.n, elapsed + 1.7);
+      b.vy = Math.max(b.vy, 1.4 + vary * 1.3);
+      b.vx += Math.sin(b.n * 1.7 + elapsed) * 1.5;
+      b.vz += Math.cos(b.n * 0.9) * 1.1;
       b.rest = 0;
     }
 
@@ -108,7 +113,7 @@ export function stepDrumMix(balls, dt, { elapsed, rotorZ, depthLimit, onWall, on
     const wall = contain(b, radius, centerY, limit);
     if (wall > 0.2 && onWall) onWall(wall);
 
-    const damp = Math.pow(0.9984, dt * 60);
+    const damp = Math.pow(0.9965, dt * 60);
     b.vx *= damp; b.vy *= damp; b.vz *= damp;
   }
 
@@ -126,7 +131,7 @@ export function stepDrumMix(balls, dt, { elapsed, rotorZ, depthLimit, onWall, on
         b.x -= nx * overlap; b.y -= ny * overlap; b.z -= nz * overlap;
         const rel = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny + (a.vz - b.vz) * nz;
         if (rel < 0) {
-          const k = 0.92;
+          const k = 0.58;
           a.vx -= rel * k * nx; a.vy -= rel * k * ny; a.vz -= rel * k * nz;
           b.vx += rel * k * nx; b.vy += rel * k * ny; b.vz += rel * k * nz;
           if (onBall) onBall(-rel);
