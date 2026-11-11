@@ -3,7 +3,8 @@ import { WIDE_CAMERA_POS, WIDE_CAMERA_TARGET } from './wide-camera.js?v=ref-shot
 import { orbitFromOffset, orbitAround, nudgeOrbit, startPointer, stepPointer, releaseIsTap, pinchScale } from './orbit-camera.js?v=one-finger-1';
 import { buildMachine, BALL_R } from './machine-model.js?v=ref-shot-27';
 import { MIX_OMEGA, stepDrumMix, readDrumBody } from './drum-mix.js?v=mix-pile-2';
-import { START_HINT_KEY, START_HINT_LABEL, shouldShowStartHint, startHintStoredValue } from './start-hint.js?v=start-hint-1';
+import { START_HINT_KEY, START_HINT_LABEL, shouldShowStartHint, startHintStoredValue } from './start-hint.js?v=power-on-1';
+import { sceneTapAction } from './scene-tap.js?v=power-on-1';
 import { lineupSlots } from './lineup.js?v=tv-reveal-1';
 import {CompatibleRenderer} from './compat.js?v=ref-shot-27';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
@@ -15,7 +16,7 @@ const colorOf=n=>reds.has(n)?'red':blues.has(n)?'blue':'green';
 function uniform(n){const a=new Uint32Array(1),limit=4294967296-(4294967296%n);do{crypto.getRandomValues(a);}while(a[0]>=limit);return a[0]%n;}
 function randomDraw(){const a=Array.from({length:49},(_,i)=>i+1);for(let i=48;i>0;i--){const j=uniform(i+1);[a[i],a[j]]=[a[j],a[i]];}return a.slice(0,7);}
 let quickActive=false,quickSession=false;
-let phase='idle',paused=false,elapsed=0,order=[],revealed=[],extracting=null,nextIndex=0,view='wide',rate=Number($('speed').value),soundOn=false,audio=null,effectsBus=null,motor=null,motorTone=null,motorNoise=null,rolling=null,lastBallHit=-1,sortStarted=false,trayMoves=[];
+let phase='idle',paused=false,elapsed=0,order=[],revealed=[],extracting=null,nextIndex=0,view='wide',rate=Number($('speed').value),soundOn=false,machineOn=false,audio=null,effectsBus=null,motor=null,motorTone=null,motorNoise=null,rolling=null,lastBallHit=-1,sortStarted=false,trayMoves=[];
 function storedMusicPrefs(){try{return readMusicPrefs(localStorage.getItem(MUSIC_STORAGE_KEY));}catch{return readMusicPrefs(null);}}
 const musicSaved=storedMusicPrefs();soundOn=musicSaved.on;
 const soundtrack=new Audio(DEFAULT_TRACK_URL);soundtrack.loop=MUSIC_LOOPS;soundtrack.volume=musicSaved.volume;soundtrack.preload='auto';
@@ -153,10 +154,11 @@ function updateSettingsSummary(){const summary=document.querySelector('[data-set
 updateTiming();
 function setStartLabel(){ $('start').textContent=`開始攪 ${$('entry-count').value} 注 ↗`; }
 function readStartHint(){try{return localStorage.getItem(START_HINT_KEY);}catch{return '1';}}
-function syncStartHint(){const hint=$('start-hint');if(!hint)return;const show=shouldShowStartHint(readStartHint())&&phase==='idle'&&!batchActive&&!quickActive;hint.hidden=!show;if(show)hint.setAttribute('aria-label',START_HINT_LABEL);$('scene')?.setAttribute('aria-label',show?START_HINT_LABEL:'攪珠盤');}
+function syncStartHint(){const hint=$('start-hint');if(!hint)return;const show=shouldShowStartHint(readStartHint())&&!machineOn&&phase==='idle'&&!batchActive&&!quickActive;hint.hidden=!show;if(show)hint.setAttribute('aria-label',START_HINT_LABEL);$('scene')?.setAttribute('aria-label',show?START_HINT_LABEL:'攪珠盤');}
 function dismissStartHint(){try{localStorage.setItem(START_HINT_KEY,startHintStoredValue());}catch{}syncStartHint();}
 function begin(){
  if(batchActive||quickActive)return;
+ machineOn=true;
  dismissStartHint();
  clearCupBalls();quickSession=false;batchTotal=Number($('entry-count').value);batchIndex=0;batchResults=[];roundOrders=[];
  batchActive=true;$('summary').classList.remove('copy-error');resetTickets(batchTotal);$('entry-count').disabled=true;$('copy').disabled=true;timelineAt=Date.now();beginRound(true);
@@ -169,7 +171,7 @@ function beginRound(scroll=false){qaEvent('round-start',{round:batchIndex+1});
  if(soundOn)startAudio();if(scroll){$('studio').focus({preventScroll:true});$('studio').scrollIntoView({behavior:reducedMotion()?'auto':'smooth',block:'start'});}
 }
 function reset(){
- userOrbit=false;orbit=null;orbitDrag=null;
+ machineOn=false;userOrbit=false;orbit=null;orbitDrag=null;
  setLiveDrawDisplay(false);quickActive=false;quickSession=false;batchActive=false;batchIndex=0;batchResults=[];roundOrders=[];timelineAt=Date.now();leaveResults();clearCupBalls();phase='idle';paused=false;elapsed=0;order=[];revealed=[];nextIndex=0;extracting=null;clearNumbers();resetMachine();resetTickets(Number($('entry-count').value));
  $('entry-count').disabled=false;$('summary').classList.remove('copy-error');$('status').textContent='準備就緒';$('step').textContent='49 顆彩球 · 等候入鼓';$('instruction').textContent='準備就緒，等待抽獎開始。';$('start').disabled=false;setStartLabel();$('pause').disabled=true;$('pause').textContent='暫停';$('copy').disabled=true;$('summary').textContent='完成攪珠後，可按鈕揭曉每注，亦可一次複製全部號碼。';$('progressfill').style.width='0%';setMotor(0);setRolling(false);setEffectsActive(false);setStageStatus('待機／設定 · 小型構圖');syncDrum();
  if(camera&&(view==='wide'||view==='auto')){camera.position.set(...WIDE_CAMERA_POS);cameraTarget.set(...WIDE_CAMERA_TARGET);camera.lookAt(cameraTarget);snapCamera=true;}
@@ -179,13 +181,22 @@ function finishRound(){
  revealComplete=false;
  qaEvent('result-shot-dwell-complete',{round:batchIndex+1,elapsed:performance.now()-resultShotStableAt});qaEvent('round-end',{round:batchIndex+1});const result={main:sortedMain(),extra:revealed[6],index:batchIndex+1};batchResults.push(result);addTicket({...result,order:revealed.slice()});clearCupBalls();resetMachine();batchIndex++;
  if(batchIndex<batchTotal){beginRound();return;}
- phase='done';batchActive=false;finishTickets();setStageStatus('本批已完成 · 球池已復位 · 各注結果保留在票券');setLiveDrawDisplay(false);$('entry-count').disabled=false;$('status').textContent=`${batchTotal} 注全部完成`;$('step').textContent='到下方按「揭曉」查看號碼';$('instruction').textContent='攪珠完成！機台已復位到完整 49 球池；按下方「揭曉」查看各注獨立票券。';$('start').disabled=false;setStartLabel();$('copy').disabled=false;$('summary').textContent=`已完成 ${batchTotal} 注，向下按鈕揭曉或一次複製全部；單式填寫只用每注六個正選。`;setMotor(0);setRolling(false);setEffectsActive(false);syncDrum();
+ phase='done';batchActive=false;machineOn=false;finishTickets();setStageStatus('本批已完成 · 球池已復位 · 各注結果保留在票券');setLiveDrawDisplay(false);$('entry-count').disabled=false;$('status').textContent=`${batchTotal} 注全部完成`;$('step').textContent='到下方按「揭曉」查看號碼';$('instruction').textContent='攪珠完成！機台已復位到完整 49 球池；按下方「揭曉」查看各注獨立票券。';$('start').disabled=false;setStartLabel();$('copy').disabled=false;$('summary').textContent=`已完成 ${batchTotal} 注，向下按鈕揭曉或一次複製全部；單式填寫只用每注六個正選。`;setMotor(0);setRolling(false);setEffectsActive(false);syncDrum();
 }
 // Unadvertised one-ball interaction, independent of the selected ticket batch.
+function powerOn(){
+ if(machineOn||batchActive||quickActive||phase==='sorting')return;
+ machineOn=true;dismissStartHint();phase='running';paused=false;elapsed=0;order=[];nextIndex=0;extracting=null;timelineAt=Date.now();
+ $('status').textContent='已開機';$('step').textContent='圓鼓攪拌中 · 再拍一下開始';$('instruction').textContent='機已開啟。再拍一下圓鼓，或按「開始攪」正式開攪。';setStageStatus('已開機 · 再拍圓鼓開始攪珠');
+ $('start').disabled=false;$('pause').disabled=true;syncDrum();
+ const firstFrame=1/60;simulate(firstFrame);rotor.rotation.z+=firstFrame*motorSpeed();updateCamera(firstFrame);renderer.render(scene,camera,true);
+ ensureEffects();setMotor(.028);if(soundOn)startAudio();
+}
 	function startFromDrum(){
 	 if(quickActive||phase==='sorting'||extracting||(quickSession&&nextIndex>=order.length))return;
-	 // From standby, reuse Start's selected-batch initialization before advancing one ball.
-	 if(!batchActive&&!quickActive&&phase==='idle')begin();
+	 const action=sceneTapAction({machineOn,drawing:batchActive&&phase==='running',blocked:false});
+	 if(action==='power'){powerOn();return;}
+	 if(action==='draw'){begin();return;}
 	 // During an automatic batch, skip only the wait for the next ball.
 	 // Keep the batch, results and selected rate on their existing timeline.
 	 if(batchActive){
@@ -575,9 +586,9 @@ function animate(){
  requestAnimationFrame(animate);const realDt=Math.min(clock.getDelta(),.1);if(!paused)realTime+=realDt;updateTimeline();if(!paused)updateDiverterGate();
  // Manual cycles advance only with rendered frames; background catch-up must never skip them.
  if(quickActive&&!paused)advanceTimeline(realDt);
- if(phase==='running'&&!paused){const dt=realDt*timelineRate(),physicsDt=Math.min(dt,.12),steps=Math.max(1,Math.ceil(physicsDt/.012));for(let i=0;i<steps;i++)simulate(physicsDt/steps);rotor.rotation.z+=dt*motorSpeed(elapsed);
- $('progressfill').style.width=Math.min(99,(elapsed/(quickActive?3.5:DRAW_END))*100)+'%';
- if(!extracting){$('status').textContent=(quickActive?'':`第 ${batchIndex+1} / ${batchTotal} 注 · `)+(quickActive?'持續攪珠':elapsed<3?'彩球入鼓':'自動攪珠中');$('step').textContent=`已揭曉 ${revealed.length} / ${order.length} 顆`;}
+ if(phase==='running'&&!paused){if(machineOn&&!batchActive&&!quickActive)elapsed+=realDt*timelineRate();const dt=realDt*timelineRate(),physicsDt=Math.min(dt,.12),steps=Math.max(1,Math.ceil(physicsDt/.012));for(let i=0;i<steps;i++)simulate(physicsDt/steps);rotor.rotation.z+=dt*motorSpeed(elapsed);
+ if(batchActive||quickActive){$('progressfill').style.width=Math.min(99,(elapsed/(quickActive?3.5:DRAW_END))*100)+'%';
+ if(!extracting){$('status').textContent=(quickActive?'':`第 ${batchIndex+1} / ${batchTotal} 注 · `)+(quickActive?'持續攪珠':elapsed<3?'彩球入鼓':'自動攪珠中');$('step').textContent=`已揭曉 ${revealed.length} / ${order.length} 顆`;}}
  setMotor(.028);const extractProgress=extracting?(elapsed-extracting.start)/extracting.duration:0;setRolling(!!extracting&&extractProgress>=.60&&extractProgress<.99);
  }else{setMotor(0);setRolling(false);}if(!paused||userOrbit)updateCamera(realDt);renderer.render(scene,camera);if(pendingStableFrame){resultShotStableAt=performance.now();qaEvent('result-shot-stable',{round:pendingStableFrame.round,duration:pendingStableFrame.duration});pendingStableFrame=null;}
 }
