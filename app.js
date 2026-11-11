@@ -2,6 +2,8 @@ import * as THREE from './three.module.js';
 import { WIDE_CAMERA_POS, WIDE_CAMERA_TARGET } from './wide-camera.js?v=ref-shot-20';
 import { orbitFromOffset, orbitAround, nudgeOrbit, startPointer, stepPointer, releaseIsTap, pinchScale } from './orbit-camera.js?v=one-finger-1';
 import { buildMachine, BALL_R } from './machine-model.js?v=ref-shot-27';
+import { MIX_OMEGA, stepDrumMix } from './drum-mix.js?v=mix-energy-1';
+import { START_HINT_KEY, START_HINT_LABEL, shouldShowStartHint, startHintStoredValue } from './start-hint.js?v=start-hint-1';
 import { lineupSlots } from './lineup.js?v=tv-reveal-1';
 import {CompatibleRenderer} from './compat.js?v=ref-shot-27';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
@@ -16,7 +18,7 @@ let quickActive=false,quickSession=false;
 let phase='idle',paused=false,elapsed=0,order=[],revealed=[],extracting=null,nextIndex=0,view='wide',rate=Number($('speed').value),soundOn=false,audio=null,effectsBus=null,motor=null,motorTone=null,motorNoise=null,rolling=null,lastBallHit=-1,sortStarted=false,trayMoves=[];
 function storedMusicPrefs(){try{return readMusicPrefs(localStorage.getItem(MUSIC_STORAGE_KEY));}catch{return readMusicPrefs(null);}}
 const musicSaved=storedMusicPrefs();soundOn=musicSaved.on;
-const soundtrack=new Audio(DEFAULT_TRACK_URL);soundtrack.loop=MUSIC_LOOPS;soundtrack.volume=musicSaved.volume;soundtrack.preload='none';
+const soundtrack=new Audio(DEFAULT_TRACK_URL);soundtrack.loop=MUSIC_LOOPS;soundtrack.volume=musicSaved.volume;soundtrack.preload='auto';
 let musicTrackLabel=DEFAULT_TRACK_NAME,customTrackUrl=null;
 function sortedMain(){return revealed.slice(0,6).sort((a,b)=>a-b);}
 function resetSort(){sortStarted=false;trayMoves=[];$('orderlabel').textContent='依出珠次序';$('draworder').hidden=true;$('draworder').textContent='';}
@@ -36,7 +38,7 @@ function startResultShot(){qaEvent('result-shot-start',{round:batchIndex+1,drawC
 function clearNumbers(){resetSort();numbers.innerHTML=Array.from({length:6},(_,i)=>`<div data-slot="${i}" class="number empty" aria-label="第 ${i+1} 個號碼尚未抽出">—</div>`).join('');$('extra').className='number empty';$('extra').textContent='＋';$('extra').setAttribute('aria-label','特別號碼尚未抽出');}
 clearNumbers();
 let renderer,scene,camera,root,rotor,balls=[],cupGroup,cupBallLayer,cupBallRecords=[],machineModel=null,clock=new THREE.Clock(),cameraTarget=new THREE.Vector3(0,1.1,0),mouseX=0,machineBounds=null,fitProbeCamera=null,machineFitVertices=null,fitCameraCache=new Map();
-const sphereGeo=new THREE.SphereGeometry(BALL_R,22,16),plainBallMaterial=new THREE.MeshStandardMaterial({color:0xf4eddb,roughness:.24,metalness:.04}),temp=new THREE.Vector3();
+const sphereGeo=new THREE.SphereGeometry(BALL_R,22,16),plainBallMaterial=new THREE.MeshStandardMaterial({color:0xf4eddb,roughness:.24,metalness:.04});
 let selectorMouth=null,selectorOcclusion=null,receiverEntryStart=null,receiverJunction=null,receiverEntryLane=null;
 let mainResultSlot=null,specialResultSlot=null,diverterGatePivot=null;
 let diverterGateAngle=0,diverterGateTarget=0,diverterGateState='down',diverterGateTransition=null;
@@ -47,9 +49,8 @@ const SPECIAL_PICKUP_DURATION=3.6;
 const pickupStart=i=>quickActive?0.9+i*1.45:8+i*19;
 const DRAW_END=8+6*19+SPECIAL_PICKUP_DURATION;
 const timelineRate=()=>quickActive?1:rate;
-// The supplied video shows clockwise mixing and no clear reversal; ease the speed only slightly at selection.
-const spinDirection=()=>-1;
-function motorSpeed(){return -3.45;}
+// Clockwise, about one turn a second, so the paddles fling the pile instead of nudging it.
+function motorSpeed(){return MIX_OMEGA;}
 
 function envTexture(){const c=document.createElement('canvas');c.width=1024;c.height=512;const g=c.getContext('2d');g.fillStyle='#c6a15a';g.fillRect(0,0,1024,512);const grad=g.createLinearGradient(0,0,0,512);grad.addColorStop(0,'#fff8e6');grad.addColorStop(.28,'#f0c86a');grad.addColorStop(.52,'#1c4658');grad.addColorStop(1,'#e2c078');g.fillStyle=grad;g.fillRect(0,0,1024,512);g.fillStyle='#fff3c4';g.fillRect(80,20,180,240);g.fillStyle='#ffe7a8';g.fillRect(560,40,90,300);g.fillStyle='#f6e2b0';g.fillRect(800,70,160,140);const t=new THREE.CanvasTexture(c);t.mapping=THREE.EquirectangularReflectionMapping;t.colorSpace=THREE.SRGBColorSpace;return t;}
 function ballTexture(n){const c=document.createElement('canvas');c.width=256;c.height=128;const g=c.getContext('2d');g.fillStyle=({red:'#cf292f',blue:'#226596',green:'#23834e'})[colorOf(n)];g.fillRect(0,0,256,128);for(let row=0;row<2;row++)for(let col=0;col<4;col++){const x=32+col*64,y=32+row*64;g.fillStyle='#fff4d1';g.beginPath();g.ellipse(x,y,23,21,0,0,Math.PI*2);g.fill();g.fillStyle='#3b3021';g.font='bold 24px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText(n,x,y+1);}const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;t.userData={number:n,color:colorOf(n)};return t;}
@@ -151,8 +152,12 @@ function updateTiming(){const seconds=Math.round(DRAW_END/rate+2.4);const durati
 function updateSettingsSummary(){const summary=document.querySelector('[data-settings-summary]');if(!summary)return;const speed=$('speed').selectedOptions[0].textContent.split(' · ')[0];summary.textContent=`${speed} · 音樂${soundOn?'開':'關'}`;}
 updateTiming();
 function setStartLabel(){ $('start').textContent=`開始攪 ${$('entry-count').value} 注 ↗`; }
+function readStartHint(){try{return localStorage.getItem(START_HINT_KEY);}catch{return '1';}}
+function syncStartHint(){const hint=$('start-hint');if(!hint)return;const show=shouldShowStartHint(readStartHint())&&phase==='idle'&&!batchActive&&!quickActive;hint.hidden=!show;if(show)hint.setAttribute('aria-label',START_HINT_LABEL);$('scene')?.setAttribute('aria-label',show?START_HINT_LABEL:'攪珠盤');}
+function dismissStartHint(){try{localStorage.setItem(START_HINT_KEY,startHintStoredValue());}catch{}syncStartHint();}
 function begin(){
  if(batchActive||quickActive)return;
+ dismissStartHint();
  clearCupBalls();quickSession=false;batchTotal=Number($('entry-count').value);batchIndex=0;batchResults=[];roundOrders=[];
  batchActive=true;$('summary').classList.remove('copy-error');resetTickets(batchTotal);$('entry-count').disabled=true;$('copy').disabled=true;timelineAt=Date.now();beginRound(true);
 }
@@ -220,57 +225,30 @@ function reveal(n,i){
 function updateSorting(){if(batchActive&&phase==='sorting')finishRound();}
 
 function simulate(dt){
- const radius=1.385,centerY=.05,spin=spinDirection(elapsed);
+ const drum=[];
  for(const b of balls){
   if(b.state==='rack'&&elapsed>(b.n-1)*.032){b.state='fall';b.vel.set(Math.sin(b.n*12.71)*.22,-.1,Math.cos(b.n*8.17)*.34);}
-  if(b.state!=='fall'&&b.state!=='drum')continue;
-  const p=b.mesh.position;
-  b.vel.y-=8.8*dt;
-  if(b.state==='drum'){
-   const rx=p.x,ry=p.y-centerY;
-   b.vel.x+=(-ry*spin*1.7+Math.sin(elapsed*4.1+b.n*2.37)*.9)*dt;
-   b.vel.y+=(rx*spin*1.7+Math.sin(elapsed*3.4+b.n*1.31)*.65)*dt;
-   b.vel.z+=Math.sin(elapsed*3+b.n*1.73)*1.15*dt;
-   const blade=Math.cos((Math.atan2(ry,rx)-rotor.rotation.z)*6);
-   if(p.y<-.52&&elapsed>(b.nextKick||0)&&blade>-.15){
-    b.vel.y=Math.max(b.vel.y,2.35+.55*(.5+.5*Math.sin(b.n*2.71+elapsed*5)));
-    b.vel.x+=Math.sin(b.n+elapsed*3)*.35;b.vel.z+=Math.cos(b.n+elapsed*2)*.24;
-    b.nextKick=elapsed+.48+(b.n%5)*.065;
-   }
-  }
-  b.vel.y=Math.min(3.3,b.vel.y);
-  const speed=b.vel.length();if(speed>4.6)b.vel.multiplyScalar(4.6/speed);
-  p.addScaledVector(b.vel,dt);
-  if(b.state==='fall'&&p.y<1.30){b.state='drum';playImpact(.19,.72);}
-  if(b.state==='drum'){
-   const radial=new THREE.Vector3(p.x,p.y-centerY,p.z),distance=radial.length();
-   if(distance>radius){
-    radial.normalize();p.copy(radial).multiplyScalar(radius);p.y+=centerY;
-    const normalSpeed=b.vel.dot(radial);
-    if(normalSpeed>0){b.vel.addScaledVector(radial,-1.58*normalSpeed);collisionSound(normalSpeed,.68);}
-   }
-  }
-  if(b.state==='drum'){
-   const depthLimit=machineModel.drumHalfDepth-BALL_R;
-   if(p.z>depthLimit){p.z=depthLimit;if(b.vel.z>0)b.vel.z*=-.62;}
-   else if(p.z<-depthLimit){p.z=-depthLimit;if(b.vel.z<0)b.vel.z*=-.62;}
-  }
-  b.vel.multiplyScalar(Math.pow(.994,dt*60));
-  b.mesh.rotation.x+=b.vel.y*dt*2;b.mesh.rotation.z-=b.vel.x*dt*2;
+  if(b.state==='fall'){
+   const p=b.mesh.position;
+   b.vel.y-=8.8*dt;
+   b.vel.y=Math.min(3.3,b.vel.y);
+   const speed=b.vel.length();if(speed>4.6)b.vel.multiplyScalar(4.6/speed);
+   p.addScaledVector(b.vel,dt);
+   b.vel.multiplyScalar(Math.pow(.994,dt*60));
+   b.mesh.rotation.x+=b.vel.y*dt*2;b.mesh.rotation.z-=b.vel.x*dt*2;
+   if(p.y<1.30){b.state='drum';playImpact(.19,.72);drum.push(b);}
+  }else if(b.state==='drum') drum.push(b);
  }
- for(let i=0;i<balls.length;i++){
-  const a=balls[i];if(a.state!=='drum')continue;
-  for(let j=i+1;j<balls.length;j++){
-   const b=balls[j];if(b.state!=='drum')continue;
-   temp.subVectors(a.mesh.position,b.mesh.position);const d=temp.length();
-   if(d<BALL_R*2&&d>.00001){
-    temp.multiplyScalar(1/d);const overlap=(BALL_R*2-d)*.5;
-    a.mesh.position.addScaledVector(temp,overlap);b.mesh.position.addScaledVector(temp,-overlap);
-    const rel=a.vel.clone().sub(b.vel).dot(temp);
-    if(rel<0){a.vel.addScaledVector(temp,-rel*.66);b.vel.addScaledVector(temp,rel*.66);collisionSound(-rel,.55);}
-   }
-  }
- }
+ if(!drum.length)return;
+ const bodies=drum.map(b=>({n:b.n,x:b.mesh.position.x,y:b.mesh.position.y,z:b.mesh.position.z,vx:b.vel.x,vy:b.vel.y,vz:b.vel.z,armed:!!b.armed,rest:b.rest||0}));
+ stepDrumMix(bodies,dt,{elapsed,rotorZ:rotor.rotation.z,depthLimit:machineModel.drumHalfDepth-BALL_R,onWall:s=>collisionSound(s,.68),onBall:s=>collisionSound(s,.55)});
+ drum.forEach((b,i)=>{
+  const s=bodies[i];
+  b.mesh.position.set(s.x,s.y,s.z);
+  b.vel.set(s.vx,s.vy,s.vz);
+  b.armed=s.armed;b.rest=s.rest;
+  b.mesh.rotation.x+=s.vy*dt*2;b.mesh.rotation.z-=s.vx*dt*2;
+ });
 }
 function extraction(){
  if(!extracting&&nextIndex<order.length&&elapsed>=pickupStart(nextIndex)){
@@ -634,7 +612,7 @@ function ensureEffects(){
  }catch{status.textContent='此瀏覽器不支援攪珠音效，請使用新版瀏覽器。';}
 }
 function persistMusic(){try{localStorage.setItem(MUSIC_STORAGE_KEY,writeMusicPrefs({on:soundOn,volume:soundtrack.volume}));}catch{}}
-function syncMusicUi(){const playing=soundOn&&!soundtrack.paused;const state=musicControlState(playing);const playBtn=$('music-play');if(playBtn){playBtn.setAttribute('aria-pressed',String(playing));playBtn.setAttribute('aria-label',state.ariaLabel);playBtn.classList.toggle('is-on',playing);const full=playBtn.querySelector('.music-label-full');if(full)full.textContent=state.label;}const legacy=$('sound');if(legacy){legacy.setAttribute('aria-pressed',String(soundOn));legacy.setAttribute('aria-label',soundOn?'關閉背景音樂':'開啟背景音樂');}const status=$('musicstatus');if(status)status.textContent=playing?'背景音樂播放中':soundOn?'點一下「音樂」或按開始即播放':'背景音樂已關閉';const track=$('music-track');if(track)track.textContent=musicTrackLabel;const vol=$('music-volume');if(vol&&document.activeElement!==vol)vol.value=String(Math.round(soundtrack.volume*100));updateSettingsSummary();persistMusic();}
+function syncMusicUi(){const playing=soundOn&&!soundtrack.paused;const state=musicControlState(playing);const playBtn=$('music-play');if(playBtn){playBtn.setAttribute('aria-pressed',String(playing));playBtn.setAttribute('aria-label',state.ariaLabel);playBtn.classList.toggle('is-on',playing);const full=playBtn.querySelector('.music-label-full');if(full)full.textContent=state.label;}const legacy=$('sound');if(legacy){legacy.setAttribute('aria-pressed',String(soundOn));legacy.setAttribute('aria-label',soundOn?'關閉背景音樂':'開啟背景音樂');}const status=$('musicstatus');if(status)status.textContent=playing?'背景音樂播放中':soundOn?'點一下畫面即播放':'背景音樂已關閉';const track=$('music-track');if(track)track.textContent=musicTrackLabel;const vol=$('music-volume');if(vol&&document.activeElement!==vol)vol.value=String(Math.round(soundtrack.volume*100));updateSettingsSummary();persistMusic();}
 function playMusic(){soundOn=true;soundtrack.loop=MUSIC_LOOPS;soundtrack.volume=clampVolume(soundtrack.volume);persistMusic();const failed=()=>{const status=$('musicstatus');if(status)status.textContent=`${musicTrackLabel}載入／播放失敗，請檢查音檔後重試。`;};try{soundtrack.play().then(()=>syncMusicUi()).catch(failed);}catch{failed();}syncMusicUi();}
 function pauseMusic(){soundOn=false;soundtrack.pause();syncMusicUi();}
 function toggleMusic(){if(soundtrack.paused)playMusic();else pauseMusic();}
@@ -643,11 +621,12 @@ function toggleMusicSettings(){const pop=$('music-popover'),btn=$('music-setting
 function useDefaultTrack(){if(customTrackUrl){URL.revokeObjectURL(customTrackUrl);customTrackUrl=null;}const resume=!soundtrack.paused||soundOn;soundtrack.src=DEFAULT_TRACK_URL;soundtrack.loop=MUSIC_LOOPS;musicTrackLabel=DEFAULT_TRACK_NAME;if(resume)playMusic();else syncMusicUi();}
 function useTrackFile(file){if(!file)return;if(customTrackUrl)URL.revokeObjectURL(customTrackUrl);customTrackUrl=URL.createObjectURL(file);const resume=!soundtrack.paused||soundOn;soundtrack.src=customTrackUrl;soundtrack.loop=MUSIC_LOOPS;musicTrackLabel=file.name;if(resume)playMusic();else syncMusicUi();}
 function startAudio(){playMusic();}
+function nudgeMusic(){if(!soundOn||!soundtrack.paused)return;soundtrack.loop=MUSIC_LOOPS;soundtrack.play().then(()=>syncMusicUi()).catch(()=>{});}
 function setMotor(v){if(motor&&audio){motor.gain.setTargetAtTime(v*2.5,audio.currentTime,.08);motorTone.frequency.setTargetAtTime(57*Math.sqrt(timelineRate()),audio.currentTime,.1);}}
 function setRolling(active){if(rolling&&audio)rolling.gain.setTargetAtTime(active?.18:0,audio.currentTime,.018);}
 function collisionSound(speed,brightness){if(!audio||audio.state!=='running'||speed<.25||audio.currentTime-lastBallHit<.038)return;lastBallHit=audio.currentTime;playImpact(Math.min(.18,.045+speed*.035),brightness);}
 function playImpact(level=.16,brightness=.6){if(!audio||audio.state!=='running'||phase!=='running'||paused)return;const now=audio.currentTime,duration=.075+Math.random()*.055,len=Math.max(1,Math.floor(audio.sampleRate*duration)),buf=audio.createBuffer(1,len,audio.sampleRate),data=buf.getChannelData(0);for(let i=0;i<len;i++)data[i]=(Math.random()*2-1)*(1-i/len);const src=audio.createBufferSource(),filter=audio.createBiquadFilter(),gain=audio.createGain();src.buffer=buf;filter.type='bandpass';filter.frequency.value=500+brightness*1500;filter.Q.value=.7;gain.gain.setValueAtTime(level,now);gain.gain.exponentialRampToValueAtTime(.001,now+duration);src.connect(filter);filter.connect(gain);gain.connect(effectsBus);src.start(now);src.stop(now+duration);const thump=audio.createOscillator(),tg=audio.createGain();thump.type='sine';thump.frequency.setValueAtTime(105+Math.random()*35,now);thump.frequency.exponentialRampToValueAtTime(58,now+.075);tg.gain.setValueAtTime(level*.42,now);tg.gain.exponentialRampToValueAtTime(.001,now+.09);thump.connect(tg);tg.connect(effectsBus);thump.start(now);thump.stop(now+.1);src.onended=()=>{src.disconnect();filter.disconnect();gain.disconnect();};thump.onended=()=>{thump.disconnect();tg.disconnect();};}
-document.addEventListener('ticket:revealed',revealCupTicket);$('start').addEventListener('click',begin);$('reset').addEventListener('click',reset);$('live-pause')?.addEventListener('click',()=>$('pause').click());$('live-reset')?.addEventListener('click',()=>$('reset').click());$('live-settings-toggle')?.addEventListener('click',()=>{const overlay=$('live-settings-overlay');if(!overlay)return;overlay.hidden=!overlay.hidden;const settings=$('inline-settings');if(settings)settings.open=!overlay.hidden;$('live-settings-toggle').setAttribute('aria-expanded',String(!overlay.hidden));});$('settings-close')?.addEventListener('click',()=>{const settings=$('inline-settings');if(settings)settings.open=false;const overlay=$('live-settings-overlay');if(overlay)overlay.hidden=true;const toggle=$('live-settings-toggle');if(toggle)toggle.setAttribute('aria-expanded','false');});$('pause').addEventListener('click',()=>{updateTimeline();if(phase!=='running')return;paused=!paused;timelineAt=Date.now();syncDrum();$('pause').textContent=paused?'繼續攪珠':'暫停';if($('live-pause'))$('live-pause').textContent=paused?'繼續':'暫停';$('status').textContent=paused?'已暫停':'攪拌中';if(paused){setMotor(0);setRolling(false);setEffectsActive(false);}else{ensureEffects();if(soundOn)startAudio();}});$('speed').addEventListener('change',e=>{updateTimeline();rate=Number(e.target.value);updateTiming();});$('sound').addEventListener('click',toggleMusic);$('music-play')?.addEventListener('click',toggleMusic);$('music-settings')?.addEventListener('click',toggleMusicSettings);$('music-popover-close')?.addEventListener('click',closeMusicSettings);$('music-use-default')?.addEventListener('click',useDefaultTrack);$('music-volume')?.addEventListener('input',()=>{soundtrack.volume=clampVolume(Number($('music-volume').value)/100);persistMusic();});$('music-pick')?.addEventListener('click',()=>$('music-file')?.click());$('music-file')?.addEventListener('change',()=>{const file=$('music-file').files&&$('music-file').files[0];useTrackFile(file);$('music-file').value='';});soundtrack.addEventListener('play',syncMusicUi);soundtrack.addEventListener('pause',syncMusicUi);document.addEventListener('pointerdown',e=>{const pop=$('music-popover'),dock=$('music-dock');if(!pop||pop.hidden||(dock&&dock.contains(e.target)))return;closeMusicSettings();});syncMusicUi();document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{if(phase==='sorting'&&b.dataset.view!=='results')return;userOrbit=false;orbit=null;orbitDrag=null;snapCamera=true;if(b.dataset.view!=='results')resultShot=null;selectView(b.dataset.view);}));$('scene').addEventListener('pointermove',e=>{const r=$('scene').getBoundingClientRect();mouseX=((e.clientX-r.left)/r.width-.5)*2;});$('scene').addEventListener('pointerleave',()=>mouseX=0);
+document.addEventListener('ticket:revealed',revealCupTicket);$('start').addEventListener('click',begin);$('reset').addEventListener('click',reset);$('live-pause')?.addEventListener('click',()=>$('pause').click());$('live-reset')?.addEventListener('click',()=>$('reset').click());$('live-settings-toggle')?.addEventListener('click',()=>{const overlay=$('live-settings-overlay');if(!overlay)return;overlay.hidden=!overlay.hidden;const settings=$('inline-settings');if(settings)settings.open=!overlay.hidden;$('live-settings-toggle').setAttribute('aria-expanded',String(!overlay.hidden));});$('settings-close')?.addEventListener('click',()=>{const settings=$('inline-settings');if(settings)settings.open=false;const overlay=$('live-settings-overlay');if(overlay)overlay.hidden=true;const toggle=$('live-settings-toggle');if(toggle)toggle.setAttribute('aria-expanded','false');});$('pause').addEventListener('click',()=>{updateTimeline();if(phase!=='running')return;paused=!paused;timelineAt=Date.now();syncDrum();$('pause').textContent=paused?'繼續攪珠':'暫停';if($('live-pause'))$('live-pause').textContent=paused?'繼續':'暫停';$('status').textContent=paused?'已暫停':'攪拌中';if(paused){setMotor(0);setRolling(false);setEffectsActive(false);}else{ensureEffects();if(soundOn)startAudio();}});$('speed').addEventListener('change',e=>{updateTimeline();rate=Number(e.target.value);updateTiming();});$('sound').addEventListener('click',toggleMusic);$('music-play')?.addEventListener('click',toggleMusic);$('music-settings')?.addEventListener('click',toggleMusicSettings);$('music-popover-close')?.addEventListener('click',closeMusicSettings);$('music-use-default')?.addEventListener('click',useDefaultTrack);$('music-volume')?.addEventListener('input',()=>{soundtrack.volume=clampVolume(Number($('music-volume').value)/100);persistMusic();});$('music-pick')?.addEventListener('click',()=>$('music-file')?.click());$('music-file')?.addEventListener('change',()=>{const file=$('music-file').files&&$('music-file').files[0];useTrackFile(file);$('music-file').value='';});soundtrack.addEventListener('play',syncMusicUi);soundtrack.addEventListener('pause',syncMusicUi);document.addEventListener('pointerdown',e=>{const pop=$('music-popover'),dock=$('music-dock');if(!pop||pop.hidden||(dock&&dock.contains(e.target)))return;closeMusicSettings();});syncMusicUi();nudgeMusic();document.addEventListener('click',nudgeMusic);document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{if(phase==='sorting'&&b.dataset.view!=='results')return;userOrbit=false;orbit=null;orbitDrag=null;snapCamera=true;if(b.dataset.view!=='results')resultShot=null;selectView(b.dataset.view);}));$('scene').addEventListener('pointermove',e=>{const r=$('scene').getBoundingClientRect();mouseX=((e.clientX-r.left)/r.width-.5)*2;});$('scene').addEventListener('pointerleave',()=>mouseX=0);
 $('entry-count').addEventListener('change',()=>{if(!batchActive&&!quickActive){setStartLabel();resetTickets(Number($('entry-count').value));}});
 // Pointer-down is the manual fast-start; pointer-up/click must not draw twice.
 $('orbit-reset')?.addEventListener('click',resetOfficialCamera);
@@ -710,7 +689,7 @@ $('scene').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.pre
 $('copy').addEventListener('click',async()=>{if(!batchResults.length)return;const text=getTicketsCopyText()+'\n（隨機娛樂模擬，非開獎預測；特別號不是單式填寫號碼。）';const feedback=$('summary');feedback.classList.remove('copy-error');feedback.textContent='';try{await navigator.clipboard.writeText(text);$('copy').textContent='全部已複製 ✓';setTimeout(()=>$('copy').textContent='複製全部號碼 ↗',1800);}catch{feedback.textContent=text+' — 請長按選取複製。';feedback.classList.add('copy-error');}});
 document.addEventListener('visibilitychange',()=>{updateTimeline();if(document.hidden){setMotor(0);setRolling(false);}clock.getDelta();});
 resetTickets(Number($('entry-count').value));syncDrum();
-try{init();}catch(error){$('loading').textContent='無法啟動 3D。請使用支援 WebGL 的新版瀏覽器，並開啟硬件加速。';$('start').disabled=true;console.error(error);}
+try{init();syncStartHint();}catch(error){$('loading').textContent='無法啟動 3D。請使用支援 WebGL 的新版瀏覽器，並開啟硬件加速。';$('start').disabled=true;console.error(error);}
 
 
 // Read-only QA diagnostics are available only when the preview URL includes ?qa=1.
@@ -722,6 +701,7 @@ if(qaActive){window.__goldenDrawPreviewBall=(drift=0)=>{window.__goldenDrawShowF
 if(qaActive){window.__goldenDrawLayout=()=>{const rests=machineModel.mainRests.map(p=>p.toArray()),special=machineModel.specialRest.toArray(),drop=machineModel.dropPath.map(p=>p.toArray());const left=rests[0],near=rests[5];const pitch=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;const centre=drop[3],spec=special;return{tubeExit:drop[1],landing:drop[2],centre,verticalDrop:drop[1][1]-drop[2][1],forwardRun:centre[2]-drop[2][2],rests,special,leftPitch:pitch(left,near),rightPitch:pitch(centre,spec),tray:machineModel.receiverEntryLane.position.toArray()};};window.__goldenDrawShowFinished=()=>{const nums=[8,15,23,31,42,47,7];balls.forEach(b=>{const i=nums.indexOf(b.n);if(i<0){b.mesh.visible=false;return;}b.mesh.visible=true;b.mesh.position.copy(i<6?machineModel.mainRests[i]:machineModel.specialRest);b.state='drawn';});renderer.render(scene,camera,true);};window.__goldenDrawGate=(open)=>{diverterGateAngle=open?1:0;diverterGateTarget=diverterGateAngle;diverterGateTransition=null;diverterGateState=open?'up':'down';applyRetainer();cameraHold=true;const blade=diverterGatePivot.getObjectByName('retainer-panel');blade.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(blade);const c=box.getCenter(new THREE.Vector3());camera.position.set(c.x+1.15,c.y+0.85,c.z+1.55);cameraTarget.copy(c);camera.lookAt(cameraTarget);renderer.render(scene,camera,true);return{state:diverterGateState,angle:diverterGateAngle,rotZ:diverterGatePivot.rotation.z,center:c.toArray(),size:box.getSize(new THREE.Vector3()).toArray()};};
 window.__goldenDrawSpecialClose=()=>{const nums=[39,1,44,49,27,6,36];revealed=nums.slice();balls.forEach(b=>{const i=nums.indexOf(b.n);if(i<0){b.mesh.visible=false;return;}showCupBall(b);b.mesh.visible=true;b.state='drawn';b.mesh.position.copy(i<6?machineModel.mainRests[i]:machineModel.specialRest);});view='wide';cameraHold=false;resultShot=null;pendingLineup=false;lineup=null;const mesh=balls.find(b=>b.n===36).mesh;startBallClose(mesh);const ball=mesh.position;camera.position.set(ball.x,ball.y+0.16,ball.z+0.92);cameraTarget.copy(ball);camera.lookAt(cameraTarget);renderer.render(scene,camera,true);return{close:!!ballClose,hold:ballClose&&ballClose.hold,pos:camera.position.toArray(),target:cameraTarget.toArray(),ball:ball.toArray()};};
 window.__goldenDrawLineup=()=>{revealed=[39,1,44,49,27,6,36];balls.forEach(b=>{const i=revealed.indexOf(b.n);if(i<0){b.mesh.visible=false;return;}showCupBall(b);b.mesh.visible=true;b.state='drawn';b.mesh.position.copy(i<6?machineModel.mainRests[i]:machineModel.specialRest);});cameraHold=false;resultShot=null;pendingLineup=false;startLineup();lineup.t0=realTime-LINEUP_MOVE;updateLineup();renderer.render(scene,camera,true);const placed=lineup.items.map(item=>({n:balls.find(b=>b.mesh===item.mesh).n,y:item.mesh.position.y,x:item.mesh.position.x}));return{cam:camera.position.toArray(),target:cameraTarget.toArray(),flat:placed};};
-window.__goldenDrawDigitCard=()=>{window.__goldenDrawLineup();lineup.phase='hold';lineup.phaseStart=realTime;showTvDigits('frame',revealed[6]);applyLineupCamera();renderer.render(scene,camera,true);return{mains:document.querySelector('#tv-main').innerText,extra:document.querySelector('#tv-extra').innerText};};}
+window.__goldenDrawDigitCard=()=>{window.__goldenDrawLineup();lineup.phase='hold';lineup.phaseStart=realTime;showTvDigits('frame',revealed[6]);applyLineupCamera();renderer.render(scene,camera,true);return{mains:document.querySelector('#tv-main').innerText,extra:document.querySelector('#tv-extra').innerText};};
+window.__goldenDrawMix=()=>{const mid=0.16;let above=0,slow=0,maxY=-Infinity,minY=Infinity;const drum=balls.filter(b=>b.state==='drum');for(const b of drum){const y=b.mesh.position.y,s=b.vel.length();if(y>mid)above++;if(s<0.45&&y<-0.65)slow++;if(y>maxY)maxY=y;if(y<minY)minY=y;}return{drum:drum.length,above,below:drum.length-above,slow,maxY,minY,elapsed};};}
 const shareButton=document.getElementById('share-app');
 shareButton?.addEventListener('click',async()=>{const shareData={title:document.title,text:'金球時光｜3D 攪珠遊戲（純粹娛樂模擬，非開獎預測）',url:location.href};try{if(navigator.share&&(!navigator.canShare||navigator.canShare(shareData))){await navigator.share(shareData);return;}await navigator.clipboard.writeText(shareData.url);shareButton.textContent='已複製連結';setTimeout(()=>shareButton.textContent='分享',1800);}catch(error){if(error.name!=='AbortError'){window.prompt('複製以下連結分享：',shareData.url);}}});

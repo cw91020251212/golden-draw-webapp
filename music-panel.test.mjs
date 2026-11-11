@@ -29,11 +29,13 @@ test('play and pause labels stay distinct from the draw pause button', () => {
   }
 });
 
-test('volume and the play choice round-trip through local storage text', () => {
-  assert.deepEqual(readMusicPrefs(null), { on: false, volume: DEFAULT_VOLUME });
-  assert.deepEqual(readMusicPrefs('not-json'), { on: false, volume: DEFAULT_VOLUME });
-  const saved = writeMusicPrefs({ on: true, volume: 1.8 });
-  assert.deepEqual(readMusicPrefs(saved), { on: true, volume: 1 });
-  assert.deepEqual(readMusicPrefs(writeMusicPrefs({ on: false, volume: -0.2 })), { on: false, volume: 0 });
+test('music is on until a returning user has paused it', () => {
+  assert.deepEqual(readMusicPrefs(null), { on: true, volume: DEFAULT_VOLUME });
+  assert.deepEqual(readMusicPrefs('not-json'), { on: true, volume: DEFAULT_VOLUME });
+  assert.deepEqual(readMusicPrefs('{"on":false,"volume":0.32}'), { on: true, volume: DEFAULT_VOLUME });
+  const playing = writeMusicPrefs({ on: true, volume: 1.8 });
+  assert.deepEqual(readMusicPrefs(playing), { on: true, volume: 1 });
+  const paused = writeMusicPrefs({ on: false, volume: 0.2 });
+  assert.deepEqual(readMusicPrefs(paused), { on: false, volume: 0.2 });
   assert.equal(clampVolume('loud'), DEFAULT_VOLUME);
 });

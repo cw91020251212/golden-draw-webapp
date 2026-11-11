@@ -594,6 +594,15 @@ body.live-draw .stage-caption{flex-wrap:nowrap}
 button.orbit-reset{position:relative;z-index:6;pointer-events:auto;flex:0 0 auto;min-height:26px;padding:3px 10px;border:1px solid #8a6424;border-radius:999px;background:linear-gradient(180deg,#f8dc8a,#d7a441);color:#3b2a10;font-size:12px;font-weight:700;letter-spacing:.3px;box-shadow:0 2px 0 #7c5a20,inset 0 1px 0 #fff6d4}
 button.orbit-reset:hover{background:linear-gradient(180deg,#ffe7a4,#e0b14e);color:#3b2a10}
 button.orbit-reset:active{transform:translateY(1px);box-shadow:0 1px 0 #7c5a20,inset 0 1px 0 #fff6d4}
+.start-hint{position:absolute;z-index:4;left:47%;top:31%;display:flex;flex-direction:column;align-items:center;width:88px;pointer-events:none;transform:translate(-50%,0);filter:drop-shadow(0 3px 4px #04101888)}
+.start-hint[hidden]{display:none !important}
+.start-hint-ring{width:18px;height:18px;margin-bottom:-6px;border:2px solid #f4d78a;border-radius:50%;box-shadow:0 0 0 6px #f4d78a33;animation:hint-ring 1.4s ease-in-out infinite}
+.start-hint-hand{width:64px;height:86px;margin-top:-4px;transform-origin:50% 12%;animation:hint-tap 1.4s ease-in-out infinite}
+.start-hint-label{margin-top:-6px;padding:3px 8px;border:1px solid #e7c56a;border-radius:999px;background:#163042d0;color:#fff6df;font-size:12px;font-weight:700;letter-spacing:.4px;white-space:nowrap}
+@keyframes hint-tap{0%,100%{transform:translateY(6px)}45%{transform:translateY(-2px)}}
+@keyframes hint-ring{0%,100%{transform:scale(.85);opacity:.7}45%{transform:scale(1.15);opacity:1}}
+@media(prefers-reduced-motion:reduce){.start-hint-hand,.start-hint-ring{animation:none}}
+body.live-draw .start-hint{display:none !important}
 .music-dock{grid-column:1 / -1;position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch}
 .music-label-short{display:none}
 #music-play,#music-settings,#music-pick{white-space:nowrap}
