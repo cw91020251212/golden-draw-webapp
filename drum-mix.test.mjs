@@ -62,9 +62,12 @@ test('a wall hit rebounds immediately instead of losing its bounce', () => {
 });
 
 test('a bottom hit immediately launches the ball visibly upward', () => {
-  const ball = { n: 1, x: 0, y: DRUM_CENTER_Y - DRUM_RADIUS - 0.01, z: 0, vx: 0, vy: -0.2, vz: 0 };
+  const ball = { n: 1, x: 0, y: DRUM_CENTER_Y - DRUM_RADIUS - 0.01, z: 0, vx: 0, vy: -0.2, vz: 0, nextKick: 10 };
   stepDrumMix([ball], 0, { elapsed: 0, rotorZ: 0, depthLimit: 0.44 });
   assert.ok(ball.vy >= 2.8, `bottom rebound should launch upward immediately: vy=${ball.vy}`);
+  const collisionY = ball.y;
+  stepDrumMix([ball], 1 / 90, { elapsed: 1 / 90, rotorZ: 0, depthLimit: 0.44 });
+  assert.ok(ball.y > collisionY, `ball should rise on the step after the collision: y=${ball.y}, collisionY=${collisionY}`);
 });
 
 test('ball-to-ball impact separates the balls with a clear rebound', () => {
