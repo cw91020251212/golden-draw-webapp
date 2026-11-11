@@ -13,6 +13,7 @@ const PADDLE_WINDOW = 0.22;
 const SCOOP_Y = -0.7;
 const WALL_RESTITUTION = 0.82;
 const MIN_WALL_REBOUND = 0.72;
+const MIN_FLOOR_UPWARD_SPEED = 2.8;
 const WALL_TANGENTIAL_FRICTION = 0.08;
 const BALL_COLLISION_IMPULSE = 0.82;
 
@@ -38,12 +39,20 @@ function contain(b, radius, centerY, depthLimit) {
     let vn = b.vx * nx + b.vy * ny + b.vz * nz;
     const outward = Math.max(0, vn);
     if (vn > 0) {
-      const rebound = -Math.max(vn * WALL_RESTITUTION, MIN_WALL_REBOUND);
-      const impulse = rebound - vn;
+      let rebound = Math.max(vn * WALL_RESTITUTION, MIN_WALL_REBOUND);
+      // A weak normal bounce at the bottom only lifts a ball a few pixels,
+      // making contact look like a pause. Guarantee a visible upward launch
+      // on the lower bowl while leaving side- and upper-wall rebounds alone.
+      if (ny < -0.5 && b.vy < 0) {
+        const tangentY = b.vy - vn * ny;
+        const needed = (MIN_FLOOR_UPWARD_SPEED - tangentY * (1 - WALL_TANGENTIAL_FRICTION)) / -ny;
+        rebound = Math.max(rebound, needed);
+      }
+      const impulse = -rebound - vn;
       b.vx += impulse * nx;
       b.vy += impulse * ny;
       b.vz += impulse * nz;
-      vn = rebound;
+      vn = -rebound;
     }
     // Glass contact should knock the ball back into the drum, not let it
     // skate around the rim and leave the floor empty.

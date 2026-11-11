@@ -61,6 +61,12 @@ test('a wall hit rebounds immediately instead of losing its bounce', () => {
   assert.ok(ball.vx <= -0.72, `wall rebound was too weak: vx=${ball.vx}`);
 });
 
+test('a bottom hit immediately launches the ball visibly upward', () => {
+  const ball = { n: 1, x: 0, y: DRUM_CENTER_Y - DRUM_RADIUS - 0.01, z: 0, vx: 0, vy: -0.2, vz: 0 };
+  stepDrumMix([ball], 0, { elapsed: 0, rotorZ: 0, depthLimit: 0.44 });
+  assert.ok(ball.vy >= 2.8, `bottom rebound should launch upward immediately: vy=${ball.vy}`);
+});
+
 test('ball-to-ball impact separates the balls with a clear rebound', () => {
   const a = { n: 1, x: -0.1, y: DRUM_CENTER_Y, z: 0, vx: 1, vy: 0, vz: 0 };
   const b = { n: 2, x: 0.1, y: DRUM_CENTER_Y, z: 0, vx: -1, vy: 0, vz: 0 };
