@@ -11,8 +11,9 @@ test('the pointing hand is only for the first visit', () => {
   assert.equal(shouldShowStartHint(startHintStoredValue()), false);
 });
 
-test('the hint is a short cue, not a tutorial', () => {
+test('the hint invites a start with one light touch', () => {
   assert.ok(START_HINT_LABEL.length <= 8);
   assert.match(START_HINT_LABEL, /圓鼓/);
-  assert.match(START_HINT_LABEL, /開機/);
+  assert.match(START_HINT_LABEL, /開始/);
+  assert.doesNotMatch(START_HINT_LABEL, /開機/);
 });
