@@ -11,6 +11,10 @@ export const BALL_RADIUS = 0.13;
 
 const PADDLE_WINDOW = 0.22;
 const SCOOP_Y = -0.7;
+const WALL_RESTITUTION = 0.82;
+const MIN_WALL_REBOUND = 0.72;
+const WALL_TANGENTIAL_FRICTION = 0.08;
+const BALL_COLLISION_IMPULSE = 0.82;
 
 export function drumMidY() {
   return DRUM_HUB_Y;
@@ -34,18 +38,19 @@ function contain(b, radius, centerY, depthLimit) {
     let vn = b.vx * nx + b.vy * ny + b.vz * nz;
     const outward = Math.max(0, vn);
     if (vn > 0) {
-      const bounce = 1.35;
-      b.vx -= bounce * vn * nx;
-      b.vy -= bounce * vn * ny;
-      b.vz -= bounce * vn * nz;
-      vn = b.vx * nx + b.vy * ny + b.vz * nz;
+      const rebound = -Math.max(vn * WALL_RESTITUTION, MIN_WALL_REBOUND);
+      const impulse = rebound - vn;
+      b.vx += impulse * nx;
+      b.vy += impulse * ny;
+      b.vz += impulse * nz;
+      vn = rebound;
     }
     // Glass contact should knock the ball back into the drum, not let it
     // skate around the rim and leave the floor empty.
     const tx = b.vx - vn * nx, ty = b.vy - vn * ny, tz = b.vz - vn * nz;
-    b.vx -= tx * 0.28;
-    b.vy -= ty * 0.28;
-    b.vz -= tz * 0.28;
+    b.vx -= tx * WALL_TANGENTIAL_FRICTION;
+    b.vy -= ty * WALL_TANGENTIAL_FRICTION;
+    b.vz -= tz * WALL_TANGENTIAL_FRICTION;
     return outward;
   }
   if (b.z > depthLimit) { b.z = depthLimit; if (b.vz > 0) b.vz *= -0.72; }
@@ -162,9 +167,12 @@ export function stepDrumMix(balls, dt, { elapsed, rotorZ, depthLimit, onWall, on
         b.x -= nx * overlap; b.y -= ny * overlap; b.z -= nz * overlap;
         const rel = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny + (a.vz - b.vz) * nz;
         if (rel < 0) {
-          const k = 0.58;
-          a.vx -= rel * k * nx; a.vy -= rel * k * ny; a.vz -= rel * k * nz;
-          b.vx += rel * k * nx; b.vy += rel * k * ny; b.vz += rel * k * nz;
+          a.vx -= rel * BALL_COLLISION_IMPULSE * nx;
+          a.vy -= rel * BALL_COLLISION_IMPULSE * ny;
+          a.vz -= rel * BALL_COLLISION_IMPULSE * nz;
+          b.vx += rel * BALL_COLLISION_IMPULSE * nx;
+          b.vy += rel * BALL_COLLISION_IMPULSE * ny;
+          b.vz += rel * BALL_COLLISION_IMPULSE * nz;
           if (onBall) onBall(-rel);
         }
       }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BALL_RADIUS, MIX_OMEGA, drumMidY, readDrumBody, stepRebuiltDrumMix, writeDrumBody } from './drum-mix.js';
+import { BALL_RADIUS, DRUM_CENTER_Y, DRUM_RADIUS, MIX_OMEGA, drumMidY, readDrumBody, stepDrumMix, stepRebuiltDrumMix, writeDrumBody } from './drum-mix.js';
 
 function pack() {
   const balls = [];
@@ -53,6 +53,20 @@ test('the live frame rebuild keeps the paddle cooldown', () => {
   writeDrumBody(back, body);
   assert.equal(back.nextKick, 3.4);
   assert.equal(back.rest, 0.2);
+});
+
+test('a wall hit rebounds immediately instead of losing its bounce', () => {
+  const ball = { n: 1, x: DRUM_RADIUS + 0.01, y: DRUM_CENTER_Y, z: 0, vx: 1.2, vy: 0, vz: 0 };
+  stepDrumMix([ball], 0, { elapsed: 0, rotorZ: 0, depthLimit: 0.44 });
+  assert.ok(ball.vx <= -0.72, `wall rebound was too weak: vx=${ball.vx}`);
+});
+
+test('ball-to-ball impact separates the balls with a clear rebound', () => {
+  const a = { n: 1, x: -0.1, y: DRUM_CENTER_Y, z: 0, vx: 1, vy: 0, vz: 0 };
+  const b = { n: 2, x: 0.1, y: DRUM_CENTER_Y, z: 0, vx: -1, vy: 0, vz: 0 };
+  stepDrumMix([a, b], 0, { elapsed: 0, rotorZ: 0, depthLimit: 0.44 });
+  assert.ok(a.vx < 0 && b.vx > 0, `balls did not rebound apart: ${a.vx}, ${b.vx}`);
+  assert.ok(b.vx - a.vx >= 1.2, `impact response felt too soft: ${b.vx - a.vx}`);
 });
 
 test('jumps clear the midline, then fall back into a moving lower pile', () => {
