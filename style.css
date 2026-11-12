@@ -596,12 +596,9 @@ button.orbit-reset:hover{background:linear-gradient(180deg,#ffe7a4,#e0b14e);colo
 button.orbit-reset:active{transform:translateY(1px);box-shadow:0 1px 0 #7c5a20,inset 0 1px 0 #fff6d4}
 .start-hint{position:absolute;z-index:4;left:47%;top:31%;display:flex;flex-direction:column;align-items:center;width:88px;pointer-events:none;transform:translate(-50%,0);filter:drop-shadow(0 3px 4px #04101888)}
 .start-hint[hidden]{display:none !important}
-.start-hint-ring{width:18px;height:18px;margin-bottom:-6px;border:2px solid #f4d78a;border-radius:50%;box-shadow:0 0 0 6px #f4d78a33;animation:hint-ring 1.4s ease-in-out infinite}
-.start-hint-hand{width:64px;height:86px;margin-top:-4px;transform-origin:50% 12%;animation:hint-tap 1.4s ease-in-out infinite}
-.start-hint-label{margin-top:-6px;padding:3px 8px;border:1px solid #e7c56a;border-radius:999px;background:#163042d0;color:#fff6df;font-size:12px;font-weight:700;letter-spacing:.4px;white-space:nowrap}
-@keyframes hint-tap{0%,100%{transform:translateY(6px)}45%{transform:translateY(-2px)}}
-@keyframes hint-ring{0%,100%{transform:scale(.85);opacity:.7}45%{transform:scale(1.15);opacity:1}}
-@media(prefers-reduced-motion:reduce){.start-hint-hand,.start-hint-ring{animation:none}}
+.start-hint-ring{width:22px;height:22px;margin-bottom:0;border:2px solid #f4d78a;border-radius:50%;box-shadow:0 0 0 5px #f4d78a24;animation:hint-ring 1.5s ease-in-out infinite}
+@keyframes hint-ring{0%,100%{transform:scale(.9);opacity:.64}45%{transform:scale(1.08);opacity:.9}}
+@media(prefers-reduced-motion:reduce){.start-hint-ring{animation:none}}
 body.live-draw .start-hint{display:none !important}
 .music-dock{grid-column:1 / -1;position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch}
 .music-label-short{display:none}
@@ -624,3 +621,44 @@ body.live-draw #live-actions #music-play{width:40px;min-width:40px;max-width:40p
 body.live-draw #live-actions #music-settings{width:26px;min-width:26px;max-width:26px;height:44px;min-height:44px;max-height:44px;flex:0 0 26px;padding:0;font-size:12px}
 body.live-draw #live-actions .music-popover{color:#26352f}
 body.live-draw #live-actions .music-popover button{width:auto;min-width:0;max-width:none;height:auto;min-height:40px;max-height:none;flex:initial;padding:8px 10px;color:#30483a;background:#fff;font-size:14px;line-height:1.2}
+
+
+/* Local preview: viewport immersion with a persistent exit control. */
+.stage-top-actions{display:flex;align-items:center;gap:12px}
+button.fullscreen-toggle{position:relative;z-index:12;min-width:92px;min-height:44px;padding:8px 12px;border:1px solid #f4f1e966;border-radius:10px;background:#f4f1e91c;color:#fff8e8;font-size:14px;font-weight:700;letter-spacing:0;white-space:nowrap;pointer-events:auto;touch-action:manipulation}
+button.fullscreen-toggle:hover{background:#f4f1e933}
+.studio.is-immersive{position:fixed;inset:0;z-index:1000;width:100vw;height:100dvh;min-height:0;max-height:none;border:0;border-radius:0;overflow:hidden;scroll-margin:0}
+.studio.is-immersive #scene{inset:0 0 calc(64px + env(safe-area-inset-bottom,0px)) 0;width:100%;height:auto}
+.studio.is-immersive .stage-top{top:calc(env(safe-area-inset-top,0px) + 10px);left:14px;right:14px;z-index:12;align-items:center;gap:8px}
+.studio.is-immersive .stage-top-actions{gap:10px}
+.studio.is-immersive .stage-top-actions #step{max-width:min(38vw,320px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.studio.is-immersive button.fullscreen-toggle{min-width:112px;min-height:48px;font-size:15px;background:#17313fdc}
+.studio.is-immersive .stage-caption{position:absolute;z-index:10;left:0;right:0;bottom:0;height:calc(64px + env(safe-area-inset-bottom,0px));padding:0 10px calc(env(safe-area-inset-bottom,0px));display:flex;align-items:center;justify-content:space-between;gap:8px;background:linear-gradient(90deg,#122d3bf5,#173744f0);border-top:1px solid #ffffff2b;font-size:13px;letter-spacing:0;pointer-events:none}
+.studio.is-immersive #scene-status{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio.is-immersive #scene-shot,.studio.is-immersive #orbit-reset{display:none}
+.studio.is-immersive .live-actions:not([hidden]){position:relative;z-index:1;display:flex;flex:0 0 auto;align-items:center;gap:6px;pointer-events:auto}
+.studio.is-immersive .live-actions>button{min-width:64px;min-height:48px;padding:6px 9px;border:1px solid #f4f1e966;border-radius:8px;background:#f4f1e91c;color:#fff8e8;font-size:14px;line-height:1.1;white-space:nowrap;pointer-events:auto;touch-action:manipulation}
+.studio.is-immersive .live-actions>button:active{transform:translateY(1px)}
+.studio.is-immersive:not(.draw-active) #live-pause,.studio.is-immersive:not(.draw-active) #live-reset{display:none}
+.studio.is-immersive .live-actions>#start{width:auto;min-width:112px;max-width:150px;min-height:48px;padding:6px 10px;background:#456852;border:1px solid #d4e0d0;color:#fff8e8;font-size:13px;letter-spacing:.3px;text-align:center}
+.studio.is-immersive .live-actions .music-dock{display:flex;flex:0 0 auto;flex-wrap:nowrap;gap:3px;grid-column:auto}
+.studio.is-immersive .live-actions .music-label-full{display:none}
+.studio.is-immersive .live-actions .music-label-short{display:inline}
+.studio.is-immersive .live-actions #music-play{width:44px;min-width:44px;max-width:44px;height:48px;min-height:48px;max-height:48px;flex:0 0 44px;padding:2px;font-size:13px}
+.studio.is-immersive .live-actions #music-settings{width:40px;min-width:40px;max-width:40px;height:48px;min-height:48px;max-height:48px;flex:0 0 40px;padding:2px;font-size:16px}
+.studio.is-immersive .live-settings-overlay:not([hidden]){position:absolute;z-index:11;top:calc(env(safe-area-inset-top,0px) + 70px);right:12px;width:min(420px,calc(100vw - 24px));max-height:calc(100dvh - 154px);overflow:auto;padding:10px;border:1px solid #d9cda9;border-radius:12px;background:#fbfaf5f5;color:#26352f;box-shadow:0 10px 36px #051b2580;backdrop-filter:blur(10px);pointer-events:auto}
+.studio.is-immersive .live-settings-overlay .inline-settings{display:block;margin:0;border:0;background:transparent}
+.studio.is-immersive .live-settings-overlay .inline-settings>summary{min-height:44px}
+.studio.is-immersive .live-settings-overlay .settings{margin:0;padding:0 10px;background:transparent}
+.studio.is-immersive .live-settings-overlay .setting select{min-height:44px}
+.studio.is-immersive .live-settings-overlay .toggle{min-height:44px}
+body.immersive-view{height:100%;overflow:hidden}
+body.immersive-view header,body.immersive-view main>.heading,body.immersive-view .layout>.results-column,body.immersive-view .controls-card,body.immersive-view .ticket-section,body.immersive-view .note,body.immersive-view main>details,body.immersive-view footer,body.immersive-view .camera-settings{display:none!important}
+body.immersive-view main{position:fixed;inset:0;width:100vw;height:100dvh;max-width:none;margin:0;padding:0;overflow:hidden}
+body.immersive-view .layout{display:block;position:absolute;inset:0;width:100%;height:100dvh;margin:0;padding:0}
+body.immersive-view .layout>.scene-column{display:block;width:100%;height:100%;min-width:0}
+@media(max-width:560px){.studio.is-immersive .stage-caption{gap:4px;padding-left:6px;padding-right:6px}.studio.is-immersive .live-actions:not([hidden]){gap:3px}.studio.is-immersive .live-actions>button{min-width:54px;padding-inline:5px;font-size:12px}.studio.is-immersive .live-actions>#start{min-width:82px;max-width:100px;padding-inline:5px;font-size:11px}.studio.is-immersive .live-actions #music-play{width:38px;min-width:38px;max-width:38px;flex-basis:38px}.studio.is-immersive .live-actions #music-settings{width:34px;min-width:34px;max-width:34px;flex-basis:34px}}
+@media(orientation:landscape) and (max-height:560px){.studio.is-immersive .stage-caption{height:calc(56px + env(safe-area-inset-bottom,0px))}.studio.is-immersive #scene{inset:0 0 calc(56px + env(safe-area-inset-bottom,0px)) 0}.studio.is-immersive .live-actions>button{min-height:44px;height:44px}.studio.is-immersive button.fullscreen-toggle{min-height:44px}.studio.is-immersive .live-settings-overlay:not([hidden]){max-height:calc(100dvh - 126px)}}
+
+/* The compact automatic live view uses the same minimum tap target. */
+body.live-draw #live-actions>#live-settings-toggle{min-width:48px;min-height:44px;height:44px;pointer-events:auto}

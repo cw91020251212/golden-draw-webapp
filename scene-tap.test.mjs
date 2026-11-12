@@ -10,3 +10,8 @@ test('a tap during the automatic batch skips the next ball, unless blocked', () 
   assert.equal(sceneTapAction({ machineOn: true, drawing: true, blocked: false }), 'skip');
   assert.equal(sceneTapAction({ machineOn: true, drawing: true, blocked: true }), 'ignore');
 });
+
+test('a tap during the final seven-number reveal advances to the next draw', () => {
+  assert.equal(sceneTapAction({ machineOn: true, drawing: false, revealing: true, blocked: false }), 'advance');
+  assert.equal(sceneTapAction({ machineOn: true, drawing: false, revealing: true, blocked: true }), 'ignore');
+});

@@ -1,10 +1,12 @@
 import * as THREE from './three.module.js';
+import { buildRollPlan, rollPosition, rollSteps } from './roll-physics.js?v=roll-physics-1';
+import { fullscreenButtonState, shouldShowStageActions } from './fullscreen-controls.js?v=fullscreen-controls-1';
 import { WIDE_CAMERA_POS, WIDE_CAMERA_TARGET } from './wide-camera.js?v=ref-shot-20';
 import { orbitFromOffset, orbitAround, nudgeOrbit, startPointer, stepPointer, releaseIsTap, pinchScale } from './orbit-camera.js?v=one-finger-1';
 import { buildMachine, BALL_R } from './machine-model.js?v=ref-shot-27';
 import { MIX_OMEGA, stepDrumMix, readDrumBody } from './drum-mix.js?v=mix-pile-3';
 import { START_HINT_KEY, START_HINT_LABEL, shouldShowStartHint, startHintStoredValue } from './start-hint.js?v=first-tap-batch-1';
-import { sceneTapAction } from './scene-tap.js?v=first-tap-batch-1';
+import { sceneTapAction } from './scene-tap.js?v=local-preview-reveal-skip-1';
 import { lineupSlots } from './lineup.js?v=tv-reveal-1';
 import {CompatibleRenderer} from './compat.js?v=ref-shot-27';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
@@ -17,6 +19,7 @@ function uniform(n){const a=new Uint32Array(1),limit=4294967296-(4294967296%n);d
 function randomDraw(){const a=Array.from({length:49},(_,i)=>i+1);for(let i=48;i>0;i--){const j=uniform(i+1);[a[i],a[j]]=[a[j],a[i]];}return a.slice(0,7);}
 let quickActive=false,quickSession=false;
 let phase='idle',paused=false,elapsed=0,order=[],revealed=[],extracting=null,nextIndex=0,view='wide',rate=Number($('speed').value),soundOn=false,machineOn=false,audio=null,effectsBus=null,motor=null,motorTone=null,motorNoise=null,rolling=null,lastBallHit=-1,sortStarted=false,trayMoves=[];
+let immersiveMode=false,nativeFullscreenActive=false;
 function storedMusicPrefs(){try{return readMusicPrefs(localStorage.getItem(MUSIC_STORAGE_KEY));}catch{return readMusicPrefs(null);}}
 const musicSaved=storedMusicPrefs();soundOn=musicSaved.on;
 const soundtrack=new Audio(DEFAULT_TRACK_URL);soundtrack.loop=MUSIC_LOOPS;soundtrack.volume=musicSaved.volume;soundtrack.preload='auto';
@@ -25,8 +28,14 @@ function sortedMain(){return revealed.slice(0,6).sort((a,b)=>a-b);}
 function resetSort(){sortStarted=false;trayMoves=[];$('orderlabel').textContent='依出珠次序';$('draworder').hidden=true;$('draworder').textContent='';}
 const numbers=$('numbers');
 function setStageStatus(text){const node=$('scene-status');if(node)node.textContent=text;}
-function setLiveDrawDisplay(active){document.body.classList.toggle('live-draw',!!active);const actions=$('live-actions'),overlay=$('live-settings-overlay'),settings=$('inline-settings'),home=document.querySelector('.controls-card');if(actions)actions.hidden=!active;if(active){if(settings&&overlay&&settings.parentElement!==overlay)overlay.appendChild(settings);if(overlay)overlay.hidden=true;if(settings)settings.open=false;}else{if(overlay)overlay.hidden=true;if(settings&&home&&settings.parentElement!==home)home.appendChild(settings);if(settings)settings.open=false;}const toggle=$('live-settings-toggle');if(toggle)toggle.setAttribute('aria-expanded','false');placeMusicDock();requestAnimationFrame(fitSafeRows);}
-function placeMusicDock(){const dock=$('music-dock'),live=$('live-actions'),home=document.querySelector('.controls-card .secondary');if(!dock||!live||!home)return;const phoneLive=document.body.classList.contains('live-draw')&&matchMedia('(max-width:760px)').matches;const parent=phoneLive?live:home;if(dock.parentElement!==parent){closeMusicSettings();parent.appendChild(dock);}}
+function updateFullscreenButton(){const button=$('fullscreen-toggle');if(!button)return;const state=fullscreenButtonState(immersiveMode);button.textContent=state.text;button.setAttribute('aria-label',state.ariaLabel);button.setAttribute('aria-pressed',state.pressed);button.dataset.fullscreenMode=nativeFullscreenActive?'native':immersiveMode?'css-fallback':'inactive';}
+function syncImmersiveLayout(){const studio=$('studio'),actions=$('live-actions'),overlay=$('live-settings-overlay'),settings=$('inline-settings'),controls=document.querySelector('.controls-card'),secondary=controls?.querySelector('.secondary'),startButton=$('start');if(!studio||!actions||!controls)return;const drawActive=document.body.classList.contains('live-draw'),compactViewport=matchMedia('(max-width:760px)').matches,showActions=shouldShowStageActions({drawActive,immersive:immersiveMode,compactViewport});studio.classList.toggle('is-immersive',immersiveMode);studio.classList.toggle('draw-active',drawActive);document.body.classList.toggle('immersive-view',immersiveMode);actions.hidden=!showActions;if(immersiveMode&&!drawActive&&startButton&&startButton.parentElement!==actions)actions.insertBefore(startButton,actions.firstChild);else if(startButton&&startButton.parentElement!==controls)controls.insertBefore(startButton,secondary);if(showActions&&overlay&&settings&&settings.parentElement!==overlay)overlay.appendChild(settings);else if(!showActions&&settings&&settings.parentElement!==controls){overlay.hidden=true;settings.open=false;controls.appendChild(settings);}if(!drawActive&&!immersiveMode){if(overlay)overlay.hidden=true;if(settings)settings.open=false;}updateFullscreenButton();placeMusicDock();requestAnimationFrame(fitSafeRows);}
+function setLiveDrawDisplay(active){document.body.classList.toggle('live-draw',!!active);if(active){const overlay=$('live-settings-overlay'),settings=$('inline-settings');if(overlay)overlay.hidden=true;if(settings)settings.open=false;}else if(!immersiveMode){const overlay=$('live-settings-overlay'),settings=$('inline-settings');if(overlay)overlay.hidden=true;if(settings)settings.open=false;}syncImmersiveLayout();}
+function setImmersiveMode(active,native=false){immersiveMode=!!active;nativeFullscreenActive=!!active&&!!native;syncImmersiveLayout();}
+async function toggleImmersiveMode(){const studio=$('studio');if(immersiveMode){if(document.fullscreenElement===studio&&document.exitFullscreen){try{await document.exitFullscreen();}catch{}if(document.fullscreenElement!==studio)setImmersiveMode(false);}else setImmersiveMode(false);return;}if(typeof studio.requestFullscreen==='function'){try{await studio.requestFullscreen();setImmersiveMode(true,true);return;}catch{}}setImmersiveMode(true,false);}
+function handleFullscreenChange(){const studio=$('studio');if(document.fullscreenElement===studio)setImmersiveMode(true,true);else if(nativeFullscreenActive)setImmersiveMode(false,false);}
+function handleImmersiveEscape(event){if(event.key==='Escape'&&immersiveMode&&document.fullscreenElement!==$('studio'))setImmersiveMode(false,false);}
+function placeMusicDock(){const dock=$('music-dock'),live=$('live-actions'),home=document.querySelector('.controls-card .secondary');if(!dock||!live||!home)return;const phoneLive=document.body.classList.contains('live-draw')&&matchMedia('(max-width:760px)').matches;const parent=(phoneLive||immersiveMode)?live:home;if(dock.parentElement!==parent){closeMusicSettings();parent.appendChild(dock);}}
 const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 const RESULT_SHOT_DWELL_MS=3200;
 let resultShot=null,resultShotStable=false,resultShotStableAt=0,pendingStableFrame=null,resultReturnView='auto';
@@ -148,13 +157,14 @@ function resetDiverterGate(){
  applyRetainer();
 }
 function revealCupTicket(event){const {index,main,extra,order=[]}=event.detail||{};qaEvent('ticket-revealed',{ticket:index});const sorted=[...main].sort((a,b)=>a-b);Array.from(numbers.children).forEach((el,i)=>{const n=sorted[i];el.textContent=String(n).padStart(2,'0');el.className='number '+colorOf(n)+' reveal';el.setAttribute('aria-label',`由小至大第 ${i+1} 個正選號碼：${n}`);});$('extra').textContent=String(extra).padStart(2,'0');$('extra').className='number '+colorOf(extra)+' reveal';$('extra').setAttribute('aria-label',`特別號碼 ${extra}`);$('orderlabel').textContent='由小至大排列';$('draworder').hidden=false;$('draworder').textContent='原出珠次序：'+order.map(n=>String(n).padStart(2,'0')).join(' → ');$('instruction').textContent=`第 ${index} 注票券已揭曉並整理號碼；攪珠機已在每注完成後復位到完整 49 球池。`;setStageStatus(`第 ${index} 注票券已揭曉 · 49 球池已復位`);}
-function syncDrum(){const enabled=!quickActive&&!extracting&&phase!=='sorting'&&(!quickSession||nextIndex<order.length);$('scene').setAttribute('aria-disabled',String(!enabled));}
+function syncDrum(){const enabled=(batchActive&&phase==='sorting')||(!quickActive&&!extracting&&phase!=='sorting'&&(!quickSession||nextIndex<order.length));$('scene').setAttribute('aria-disabled',String(!enabled));}
 function updateTiming(){const seconds=Math.round(DRAW_END/rate+2.4);const durationText=rate===1?'每注約 2 分鐘':`每注約 ${seconds} 秒`;document.querySelector('.timing').textContent=`${rate===1?'正常節奏':$('speed').selectedOptions[0].textContent.split(' · ')[0]} · ${durationText}`;updateSettingsSummary();}
 function updateSettingsSummary(){const summary=document.querySelector('[data-settings-summary]');if(!summary)return;const speed=$('speed').selectedOptions[0].textContent.split(' · ')[0];summary.textContent=`${speed} · 音樂${soundOn?'開':'關'}`;}
 updateTiming();
 function setStartLabel(){ $('start').textContent=`開始攪 ${$('entry-count').value} 注 ↗`; }
 function readStartHint(){try{return localStorage.getItem(START_HINT_KEY);}catch{return '1';}}
-function syncStartHint(){const hint=$('start-hint');if(!hint)return;const show=shouldShowStartHint(readStartHint())&&!machineOn&&phase==='idle'&&!batchActive&&!quickActive;hint.hidden=!show;if(show)hint.setAttribute('aria-label',START_HINT_LABEL);$('scene')?.setAttribute('aria-label',show?START_HINT_LABEL:'攪珠盤');}
+const forceStartHintPreview=new URLSearchParams(location.search).has('hint-preview');
+function syncStartHint(){const hint=$('start-hint');if(!hint)return;const show=(forceStartHintPreview||shouldShowStartHint(readStartHint()))&&!machineOn&&phase==='idle'&&!batchActive&&!quickActive;hint.hidden=!show;if(show)hint.setAttribute('aria-label',START_HINT_LABEL);$('scene')?.setAttribute('aria-label',show?START_HINT_LABEL:'攪珠盤');}
 function dismissStartHint(){try{localStorage.setItem(START_HINT_KEY,startHintStoredValue());}catch{}syncStartHint();}
 function begin(){
  if(batchActive||quickActive)return;
@@ -176,10 +186,10 @@ function reset(){
  $('entry-count').disabled=false;$('summary').classList.remove('copy-error');$('status').textContent='準備就緒';$('step').textContent='49 顆彩球 · 等候入鼓';$('instruction').textContent='準備就緒，等待抽獎開始。';$('start').disabled=false;setStartLabel();$('pause').disabled=true;$('pause').textContent='暫停';$('copy').disabled=true;$('summary').textContent='完成攪珠後，可按鈕揭曉每注，亦可一次複製全部號碼。';$('progressfill').style.width='0%';setMotor(0);setRolling(false);setEffectsActive(false);setStageStatus('待機／設定 · 小型構圖');syncDrum();
  if(camera&&(view==='wide'||view==='auto')){camera.position.set(...WIDE_CAMERA_POS);cameraTarget.set(...WIDE_CAMERA_TARGET);camera.lookAt(cameraTarget);snapCamera=true;}
 }
-function finishRound(){
- if(!batchActive||phase!=='sorting'||!revealComplete)return;
+function finishRound({skipped=false}={}){
+ if(!batchActive||phase!=='sorting'||(!revealComplete&&!skipped))return;
  revealComplete=false;
- qaEvent('result-shot-dwell-complete',{round:batchIndex+1,elapsed:performance.now()-resultShotStableAt});qaEvent('round-end',{round:batchIndex+1});const result={main:sortedMain(),extra:revealed[6],index:batchIndex+1};batchResults.push(result);addTicket({...result,order:revealed.slice()});clearCupBalls();resetMachine();batchIndex++;
+ if(skipped)qaEvent('result-reveal-skipped',{round:batchIndex+1});else qaEvent('result-shot-dwell-complete',{round:batchIndex+1,elapsed:performance.now()-resultShotStableAt});qaEvent('round-end',{round:batchIndex+1});const result={main:sortedMain(),extra:revealed[6],index:batchIndex+1};batchResults.push(result);addTicket({...result,order:revealed.slice()});clearCupBalls();resetMachine();batchIndex++;
  if(batchIndex<batchTotal){beginRound();return;}
  phase='done';batchActive=false;machineOn=false;finishTickets();setStageStatus('本批已完成 · 球池已復位 · 各注結果保留在票券');setLiveDrawDisplay(false);$('entry-count').disabled=false;$('status').textContent=`${batchTotal} 注全部完成`;$('step').textContent='到下方按「揭曉」查看號碼';$('instruction').textContent='攪珠完成！機台已復位到完整 49 球池；按下方「揭曉」查看各注獨立票券。';$('start').disabled=false;setStartLabel();$('copy').disabled=false;$('summary').textContent=`已完成 ${batchTotal} 注，向下按鈕揭曉或一次複製全部；單式填寫只用每注六個正選。`;setMotor(0);setRolling(false);setEffectsActive(false);syncDrum();
 }
@@ -193,8 +203,9 @@ function powerOn(){
  ensureEffects();setMotor(.028);if(soundOn)startAudio();
 }
 	function startFromDrum(){
-	 if(quickActive||phase==='sorting'||extracting||(quickSession&&nextIndex>=order.length))return;
-	 const action=sceneTapAction({machineOn,drawing:batchActive&&phase==='running',blocked:false});
+	 if(quickActive||extracting||(quickSession&&nextIndex>=order.length))return;
+	 const action=sceneTapAction({machineOn,drawing:batchActive&&phase==='running',revealing:batchActive&&phase==='sorting',blocked:false});
+	 if(action==='advance'){finishRound({skipped:true});return;}
 	 if(action==='power'){powerOn();return;}
 	 if(action==='draw'){begin();return;}
 	 // During an automatic batch, skip only the wait for the next ball.
@@ -261,12 +272,13 @@ function simulate(dt){
   b.mesh.rotation.x+=s.vy*dt*2;b.mesh.rotation.z-=s.vx*dt*2;
  });
 }
+function applyRollPlans(mesh,initialQuaternion,plans){const parentWorld=mesh.parent?mesh.parent.getWorldQuaternion(new THREE.Quaternion()):new THREE.Quaternion();const worldQuaternion=parentWorld.clone().multiply(initialQuaternion);for(const item of plans){for(const step of rollSteps(item.plan,item.progress)){const axis=new THREE.Vector3(...step.axis);worldQuaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(axis,step.angle));}}mesh.quaternion.copy(parentWorld.invert().multiply(worldQuaternion));}
 function extraction(){
  if(!extracting&&nextIndex<order.length&&elapsed>=pickupStart(nextIndex)){
   const b=balls.find(b=>b.n===order[nextIndex]);
   const index=nextIndex;b.state='extract';
   const duration=quickActive?1.35:(index===6?SPECIAL_PICKUP_DURATION:NORMAL_PICKUP_DURATION);
-  extracting={b,index,start:pickupStart(index),duration,from:b.mesh.position.clone(),tubeLogged:false,rollLogged:false,gateRequested:false,sfx:{slot:false}};
+  extracting={b,index,start:pickupStart(index),duration,from:b.mesh.position.clone(),rotationStart:b.mesh.quaternion.clone(),dropRollPlan:buildRollPlan(machineModel.dropPath.slice(2),BALL_R),rollPlan:buildRollPlan(index===6?machineModel.specialRoll:machineModel.rollPath(index),BALL_R),tubeLogged:false,rollLogged:false,gateRequested:false,sfx:{slot:false}};
   qaEvent('ball-selected',{round:batchIndex+1,index:index+1,n:b.n});
   ballClose=null;
   $('status').textContent=index===6?'特別號落入鼓底中央透明管':'選中球落入鼓底中央透明管';
@@ -278,25 +290,24 @@ function extraction(){
  const clamp01=x=>Math.max(0,Math.min(1,x));
  const logTube=()=>{if(e.tubeLogged)return;e.tubeLogged=true;showCupBall(e.b);qaEvent('selector-tube-entry',{round:batchIndex+1,index:e.index+1,n:e.b.n});playImpact(.18,.72);};
  const glide=(a,b,u)=>{p.lerpVectors(a,b,clamp01(u));};
- // Absolute spin so timeline catch-up cannot wind the ball extra times.
- e.b.mesh.rotation.z=-(e.index===6?t*8:t*16);e.b.mesh.rotation.y=.35;
+ // Receiver rolling is recalculated from travelled path distance, so timeline catch-up does not add phantom spin.
  if(e.index!==6){
   if(!e.gateRequested){e.gateRequested=true;setDiverterGate(false);}
   // Mouth, down the centre tube, fall onto the flat crown, then left. The gate stays shut across the right mouth.
   if(t<.14){e.b.mesh.visible=true;glide(e.from,drop[0],smooth(t/.14));p.y+=Math.sin(Math.PI*t/.14)*.08;}
   else if(t<.28){logTube();e.b.mesh.visible=true;glide(drop[0],drop[1],smooth((t-.14)/.14));}
   else if(t<.42){logTube();e.b.mesh.visible=true;glide(drop[1],drop[2],smooth((t-.28)/.14));}
-  else if(t<.56){logTube();e.b.mesh.visible=true;glide(drop[2],drop[3],smooth((t-.42)/.14));}
+  else if(t<.56){logTube();e.b.mesh.visible=true;const u=smooth((t-.42)/.14);p.fromArray(rollPosition(e.dropRollPlan,u));applyRollPlans(e.b.mesh,e.rotationStart,[{plan:e.dropRollPlan,progress:u}]);}
   else{
    logTube();e.b.mesh.visible=true;
-   const roll=machineModel.rollPath(e.index),u=smooth(clamp01((t-.56)/.44));
-   const f=(roll.length-1)*u,i0=Math.min(roll.length-2,Math.floor(f));
-   glide(roll[i0],roll[Math.min(roll.length-1,i0+1)],f-i0);
+   const u=smooth(clamp01((t-.56)/.44));
+   p.fromArray(rollPosition(e.rollPlan,u));
+   applyRollPlans(e.b.mesh,e.rotationStart,[{plan:e.dropRollPlan,progress:1},{plan:e.rollPlan,progress:u}]);
    if(!e.rollLogged){e.rollLogged=true;qaEvent('ball-rolling-left',{round:batchIndex+1,index:e.index+1,n:e.b.n,color:colorOf(e.b.n)});}
   }
   if(t>=.96&&!e.sfx.slot){e.sfx.slot=true;playImpact(.15,.54);}
   if(t>=1){
-   p.copy(machineModel.mainRests[e.index]);e.b.state='drawn';e.b.mesh.visible=true;e.b.mesh.rotation.set(0,.4,0);
+   p.copy(machineModel.mainRests[e.index]);e.b.state='drawn';e.b.mesh.visible=true;
    qaEvent('ball-in-cup',{round:batchIndex+1,index:e.index+1,n:e.b.n,color:colorOf(e.b.n),slot:'main'});
    qaEvent('main-ball-rolled-left',{round:batchIndex+1,index:e.index+1,n:e.b.n,drawOrder:e.index+1});
    setStageStatus(e.index===0?'第 1 顆已滾到左壁停定':`第 ${e.index+1} 顆已挨著前一顆，由左至右排好`);
@@ -312,16 +323,16 @@ function extraction(){
  if(t<.14){e.b.mesh.visible=true;glide(e.from,drop[0],smooth(t/.14));p.y+=Math.sin(Math.PI*t/.14)*.08;}
  else if(t<.28){logTube();e.b.mesh.visible=true;glide(drop[0],drop[1],smooth((t-.14)/.14));}
  else if(t<.42){logTube();e.b.mesh.visible=true;glide(drop[1],drop[2],smooth((t-.28)/.14));}
- else if(t<.56){logTube();e.b.mesh.visible=true;glide(drop[2],drop[3],smooth((t-.42)/.14));}
+ else if(t<.56){logTube();e.b.mesh.visible=true;const u=smooth((t-.42)/.14);p.fromArray(rollPosition(e.dropRollPlan,u));applyRollPlans(e.b.mesh,e.rotationStart,[{plan:e.dropRollPlan,progress:u}]);}
  else{
   logTube();e.b.mesh.visible=true;
-  const roll=machineModel.specialRoll,u=smooth(clamp01((t-.56)/.44));
-  const f=(roll.length-1)*u,i0=Math.min(roll.length-2,Math.floor(f));
-  glide(roll[i0],roll[Math.min(roll.length-1,i0+1)],f-i0);
+  const u=smooth(clamp01((t-.56)/.44));
+  p.fromArray(rollPosition(e.rollPlan,u));
+  applyRollPlans(e.b.mesh,e.rotationStart,[{plan:e.dropRollPlan,progress:1},{plan:e.rollPlan,progress:u}]);
   if(!e.rollLogged){e.rollLogged=true;qaEvent('special-ball-drops-to-peak',{round:batchIndex+1,index:7,n:e.b.n,gateState:diverterGateState});}
  }
  if(t>=1){
-  p.copy(machineModel.specialRest);e.b.state='drawn';e.b.mesh.visible=true;e.b.mesh.rotation.set(0,.4,0);
+  p.copy(machineModel.specialRest);e.b.state='drawn';e.b.mesh.visible=true;
   if(!e.sfx.slot){e.sfx.slot=true;playImpact(.15,.54);}
   qaEvent('ball-in-cup',{round:batchIndex+1,index:7,n:e.b.n,color:colorOf(e.b.n),slot:'special',gateState:diverterGateState});
   qaEvent('special-ball-rolled-right',{round:batchIndex+1,index:7,n:e.b.n,drawOrder:7});
@@ -637,7 +648,7 @@ function setMotor(v){if(motor&&audio){motor.gain.setTargetAtTime(v*2.5,audio.cur
 function setRolling(active){if(rolling&&audio)rolling.gain.setTargetAtTime(active?.18:0,audio.currentTime,.018);}
 function collisionSound(speed,brightness){if(!audio||audio.state!=='running'||speed<.25||audio.currentTime-lastBallHit<.038)return;lastBallHit=audio.currentTime;playImpact(Math.min(.18,.045+speed*.035),brightness);}
 function playImpact(level=.16,brightness=.6){if(!audio||audio.state!=='running'||phase!=='running'||paused)return;const now=audio.currentTime,duration=.075+Math.random()*.055,len=Math.max(1,Math.floor(audio.sampleRate*duration)),buf=audio.createBuffer(1,len,audio.sampleRate),data=buf.getChannelData(0);for(let i=0;i<len;i++)data[i]=(Math.random()*2-1)*(1-i/len);const src=audio.createBufferSource(),filter=audio.createBiquadFilter(),gain=audio.createGain();src.buffer=buf;filter.type='bandpass';filter.frequency.value=500+brightness*1500;filter.Q.value=.7;gain.gain.setValueAtTime(level,now);gain.gain.exponentialRampToValueAtTime(.001,now+duration);src.connect(filter);filter.connect(gain);gain.connect(effectsBus);src.start(now);src.stop(now+duration);const thump=audio.createOscillator(),tg=audio.createGain();thump.type='sine';thump.frequency.setValueAtTime(105+Math.random()*35,now);thump.frequency.exponentialRampToValueAtTime(58,now+.075);tg.gain.setValueAtTime(level*.42,now);tg.gain.exponentialRampToValueAtTime(.001,now+.09);thump.connect(tg);tg.connect(effectsBus);thump.start(now);thump.stop(now+.1);src.onended=()=>{src.disconnect();filter.disconnect();gain.disconnect();};thump.onended=()=>{thump.disconnect();tg.disconnect();};}
-document.addEventListener('ticket:revealed',revealCupTicket);$('start').addEventListener('click',begin);$('reset').addEventListener('click',reset);$('live-pause')?.addEventListener('click',()=>$('pause').click());$('live-reset')?.addEventListener('click',()=>$('reset').click());$('live-settings-toggle')?.addEventListener('click',()=>{const overlay=$('live-settings-overlay');if(!overlay)return;overlay.hidden=!overlay.hidden;const settings=$('inline-settings');if(settings)settings.open=!overlay.hidden;$('live-settings-toggle').setAttribute('aria-expanded',String(!overlay.hidden));});$('settings-close')?.addEventListener('click',()=>{const settings=$('inline-settings');if(settings)settings.open=false;const overlay=$('live-settings-overlay');if(overlay)overlay.hidden=true;const toggle=$('live-settings-toggle');if(toggle)toggle.setAttribute('aria-expanded','false');});$('pause').addEventListener('click',()=>{updateTimeline();if(phase!=='running')return;paused=!paused;timelineAt=Date.now();syncDrum();$('pause').textContent=paused?'繼續攪珠':'暫停';if($('live-pause'))$('live-pause').textContent=paused?'繼續':'暫停';$('status').textContent=paused?'已暫停':'攪拌中';if(paused){setMotor(0);setRolling(false);setEffectsActive(false);}else{ensureEffects();if(soundOn)startAudio();}});$('speed').addEventListener('change',e=>{updateTimeline();rate=Number(e.target.value);updateTiming();});$('sound').addEventListener('click',toggleMusic);$('music-play')?.addEventListener('click',toggleMusic);$('music-settings')?.addEventListener('click',toggleMusicSettings);$('music-popover-close')?.addEventListener('click',closeMusicSettings);$('music-use-default')?.addEventListener('click',useDefaultTrack);$('music-volume')?.addEventListener('input',()=>{soundtrack.volume=clampVolume(Number($('music-volume').value)/100);persistMusic();});$('music-pick')?.addEventListener('click',()=>$('music-file')?.click());$('music-file')?.addEventListener('change',()=>{const file=$('music-file').files&&$('music-file').files[0];useTrackFile(file);$('music-file').value='';});soundtrack.addEventListener('play',syncMusicUi);soundtrack.addEventListener('pause',syncMusicUi);document.addEventListener('pointerdown',e=>{const pop=$('music-popover'),dock=$('music-dock');if(!pop||pop.hidden||(dock&&dock.contains(e.target)))return;closeMusicSettings();});syncMusicUi();nudgeMusic();document.addEventListener('click',nudgeMusic);document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{if(phase==='sorting'&&b.dataset.view!=='results')return;userOrbit=false;orbit=null;orbitDrag=null;snapCamera=true;if(b.dataset.view!=='results')resultShot=null;selectView(b.dataset.view);}));$('scene').addEventListener('pointermove',e=>{const r=$('scene').getBoundingClientRect();mouseX=((e.clientX-r.left)/r.width-.5)*2;});$('scene').addEventListener('pointerleave',()=>mouseX=0);
+document.addEventListener('ticket:revealed',revealCupTicket);$('fullscreen-toggle')?.addEventListener('click',toggleImmersiveMode);document.addEventListener('fullscreenchange',handleFullscreenChange);document.addEventListener('keydown',handleImmersiveEscape);window.addEventListener('resize',syncImmersiveLayout);$('start').addEventListener('click',begin);$('reset').addEventListener('click',reset);$('live-pause')?.addEventListener('click',()=>$('pause').click());$('live-reset')?.addEventListener('click',()=>$('reset').click());$('live-settings-toggle')?.addEventListener('click',()=>{const overlay=$('live-settings-overlay');if(!overlay)return;overlay.hidden=!overlay.hidden;const settings=$('inline-settings');if(settings)settings.open=!overlay.hidden;$('live-settings-toggle').setAttribute('aria-expanded',String(!overlay.hidden));});$('settings-close')?.addEventListener('click',()=>{const settings=$('inline-settings');if(settings)settings.open=false;const overlay=$('live-settings-overlay');if(overlay)overlay.hidden=true;const toggle=$('live-settings-toggle');if(toggle)toggle.setAttribute('aria-expanded','false');});$('pause').addEventListener('click',()=>{updateTimeline();if(phase!=='running')return;paused=!paused;timelineAt=Date.now();syncDrum();$('pause').textContent=paused?'繼續攪珠':'暫停';if($('live-pause'))$('live-pause').textContent=paused?'繼續':'暫停';$('status').textContent=paused?'已暫停':'攪拌中';if(paused){setMotor(0);setRolling(false);setEffectsActive(false);}else{ensureEffects();if(soundOn)startAudio();}});$('speed').addEventListener('change',e=>{updateTimeline();rate=Number(e.target.value);updateTiming();});$('sound').addEventListener('click',toggleMusic);$('music-play')?.addEventListener('click',toggleMusic);$('music-settings')?.addEventListener('click',toggleMusicSettings);$('music-popover-close')?.addEventListener('click',closeMusicSettings);$('music-use-default')?.addEventListener('click',useDefaultTrack);$('music-volume')?.addEventListener('input',()=>{soundtrack.volume=clampVolume(Number($('music-volume').value)/100);persistMusic();});$('music-pick')?.addEventListener('click',()=>$('music-file')?.click());$('music-file')?.addEventListener('change',()=>{const file=$('music-file').files&&$('music-file').files[0];useTrackFile(file);$('music-file').value='';});soundtrack.addEventListener('play',syncMusicUi);soundtrack.addEventListener('pause',syncMusicUi);document.addEventListener('pointerdown',e=>{const pop=$('music-popover'),dock=$('music-dock');if(!pop||pop.hidden||(dock&&dock.contains(e.target)))return;closeMusicSettings();});syncMusicUi();nudgeMusic();document.addEventListener('click',nudgeMusic);document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{if(phase==='sorting'&&b.dataset.view!=='results')return;userOrbit=false;orbit=null;orbitDrag=null;snapCamera=true;if(b.dataset.view!=='results')resultShot=null;selectView(b.dataset.view);}));$('scene').addEventListener('pointermove',e=>{const r=$('scene').getBoundingClientRect();mouseX=((e.clientX-r.left)/r.width-.5)*2;});$('scene').addEventListener('pointerleave',()=>mouseX=0);
 $('entry-count').addEventListener('change',()=>{if(!batchActive&&!quickActive){setStartLabel();resetTickets(Number($('entry-count').value));}});
 // Pointer-down is the manual fast-start; pointer-up/click must not draw twice.
 $('orbit-reset')?.addEventListener('click',resetOfficialCamera);
@@ -699,7 +710,7 @@ $('scene').addEventListener('click',e=>{if(e.detail===0)startFromDrum();});
 $('scene').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();if(!e.repeat)startFromDrum();}});
 $('copy').addEventListener('click',async()=>{if(!batchResults.length)return;const text=getTicketsCopyText()+'\n（隨機娛樂模擬，非開獎預測；特別號不是單式填寫號碼。）';const feedback=$('summary');feedback.classList.remove('copy-error');feedback.textContent='';try{await navigator.clipboard.writeText(text);$('copy').textContent='全部已複製 ✓';setTimeout(()=>$('copy').textContent='複製全部號碼 ↗',1800);}catch{feedback.textContent=text+' — 請長按選取複製。';feedback.classList.add('copy-error');}});
 document.addEventListener('visibilitychange',()=>{updateTimeline();if(document.hidden){setMotor(0);setRolling(false);}clock.getDelta();});
-resetTickets(Number($('entry-count').value));syncDrum();
+resetTickets(Number($('entry-count').value));syncDrum();syncImmersiveLayout();
 try{init();syncStartHint();}catch(error){$('loading').textContent='無法啟動 3D。請使用支援 WebGL 的新版瀏覽器，並開啟硬件加速。';$('start').disabled=true;console.error(error);}
 
 
