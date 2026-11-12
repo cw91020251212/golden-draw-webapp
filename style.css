@@ -241,11 +241,11 @@ button,select,a{touch-action:manipulation}
 /* Multi-entry control additions; keep the original nostalgic studio intact. */
 .batch-controls{grid-column:1/-1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;width:100%;margin-bottom:6px}
 .batch-controls label{font-size:20px;font-weight:700}.batch-controls select{font-size:18px;min-height:50px;border:1px solid #bec8b5;background:#fbfaf5;color:#26352f;border-radius:5px;padding:9px 12px;max-width:100%}
-#entry-hint{flex-basis:100%;font-size:15px;line-height:1.6;margin:0;color:#526154}
+
 #scene[aria-disabled="false"]{cursor:pointer}#scene:focus-visible{outline:3px solid #f4d181;outline-offset:-5px}
 
 .ticket-section{scroll-margin-top:20px}
-@media(max-width:560px){.batch-controls{gap:8px}.batch-controls label{font-size:18px}.batch-controls select{flex:1;min-width:0;font-size:16px}#entry-hint{font-size:14px}}
+@media(max-width:560px){.batch-controls{gap:8px}.batch-controls label{font-size:18px}.batch-controls select{flex:1;min-width:0;font-size:16px}}
 
 @media(min-width:761px){.ticket-intro .ticket-repeat{display:none}}
 
@@ -262,7 +262,7 @@ main{padding:12px clamp(14px,3vw,40px) 0}
 .controls-card .batch-controls{grid-area:batch;grid-column:auto;display:flex;align-items:center;gap:10px;flex-wrap:nowrap;width:100%;margin:0}
 .batch-controls label{font-size:16px;white-space:nowrap}
 .batch-controls select{min-height:44px;padding:7px 10px;font-size:16px;min-width:0;flex:1}
-#entry-hint{grid-area:hint;flex-basis:auto;margin:0;color:#526154;font-size:14px;line-height:1.5}
+
 .controls-card>.primary{grid-area:start;width:100%;min-height:48px;padding:10px 14px;text-align:center;font-size:18px;letter-spacing:.4px}
 .controls-card>.secondary{grid-area:secondary;display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:0}
 .controls-card>.secondary button{min-height:44px;padding:8px 6px;font-size:14px}
@@ -346,7 +346,7 @@ footer{padding:14px clamp(14px,3vw,40px) 18px;font-size:11px;letter-spacing:.2px
  .controls-card{grid-template-columns:minmax(210px,1fr) minmax(190px,.9fr) minmax(185px,.8fr);gap:8px 10px;padding:10px 12px}
  .batch-controls label{font-size:14px}
  .batch-controls select{font-size:14px}
- #entry-hint{font-size:12px}
+
  .controls-card>.primary{font-size:16px}
  .controls-card>.secondary button{font-size:12px}
  .layout{grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:12px}
@@ -365,7 +365,7 @@ footer{padding:14px clamp(14px,3vw,40px) 18px;font-size:11px;letter-spacing:.2px
  .controls-card .batch-controls{grid-area:batch;display:flex;flex-wrap:nowrap;gap:8px;margin:0}
  .batch-controls label{font-size:14px}
  .batch-controls select{flex:1;min-width:0;min-height:44px;font-size:14px;padding:6px 8px}
- #entry-hint{grid-area:hint;font-size:12px;line-height:1.45}
+
  .controls-card>.primary{grid-area:start;min-height:48px;font-size:18px;text-align:center}
  .controls-card>.secondary{grid-area:secondary;grid-template-columns:1fr 1fr;gap:8px}
  .controls-card>.secondary button{min-height:44px;font-size:14px}
@@ -594,12 +594,6 @@ body.live-draw .stage-caption{flex-wrap:nowrap}
 button.orbit-reset{position:relative;z-index:6;pointer-events:auto;flex:0 0 auto;min-height:26px;padding:3px 10px;border:1px solid #8a6424;border-radius:999px;background:linear-gradient(180deg,#f8dc8a,#d7a441);color:#3b2a10;font-size:12px;font-weight:700;letter-spacing:.3px;box-shadow:0 2px 0 #7c5a20,inset 0 1px 0 #fff6d4}
 button.orbit-reset:hover{background:linear-gradient(180deg,#ffe7a4,#e0b14e);color:#3b2a10}
 button.orbit-reset:active{transform:translateY(1px);box-shadow:0 1px 0 #7c5a20,inset 0 1px 0 #fff6d4}
-.start-hint{position:absolute;z-index:4;left:47%;top:31%;display:flex;flex-direction:column;align-items:center;width:88px;pointer-events:none;transform:translate(-50%,0);filter:drop-shadow(0 3px 4px #04101888)}
-.start-hint[hidden]{display:none !important}
-.start-hint-ring{width:22px;height:22px;margin-bottom:0;border:2px solid #f4d78a;border-radius:50%;box-shadow:0 0 0 5px #f4d78a24;animation:hint-ring 1.5s ease-in-out infinite}
-@keyframes hint-ring{0%,100%{transform:scale(.9);opacity:.64}45%{transform:scale(1.08);opacity:.9}}
-@media(prefers-reduced-motion:reduce){.start-hint-ring{animation:none}}
-body.live-draw .start-hint{display:none !important}
 .music-dock{grid-column:1 / -1;position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch}
 .music-label-short{display:none}
 #music-play,#music-settings,#music-pick{white-space:nowrap}

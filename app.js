@@ -5,7 +5,6 @@ import { WIDE_CAMERA_POS, WIDE_CAMERA_TARGET } from './wide-camera.js?v=ref-shot
 import { orbitFromOffset, orbitAround, nudgeOrbit, startPointer, stepPointer, releaseIsTap, pinchScale } from './orbit-camera.js?v=one-finger-1';
 import { buildMachine, BALL_R } from './machine-model.js?v=ref-shot-27';
 import { MIX_OMEGA, stepDrumMix, readDrumBody } from './drum-mix.js?v=mix-pile-3';
-import { START_HINT_KEY, START_HINT_LABEL, shouldShowStartHint, startHintStoredValue } from './start-hint.js?v=first-tap-batch-1';
 import { sceneTapAction } from './scene-tap.js?v=local-preview-reveal-skip-1';
 import { lineupSlots } from './lineup.js?v=tv-reveal-1';
 import {CompatibleRenderer} from './compat.js?v=ref-shot-27';
@@ -162,14 +161,10 @@ function updateTiming(){const seconds=Math.round(DRAW_END/rate+2.4);const durati
 function updateSettingsSummary(){const summary=document.querySelector('[data-settings-summary]');if(!summary)return;const speed=$('speed').selectedOptions[0].textContent.split(' · ')[0];summary.textContent=`${speed} · 音樂${soundOn?'開':'關'}`;}
 updateTiming();
 function setStartLabel(){ $('start').textContent=`開始攪 ${$('entry-count').value} 注 ↗`; }
-function readStartHint(){try{return localStorage.getItem(START_HINT_KEY);}catch{return '1';}}
-const forceStartHintPreview=new URLSearchParams(location.search).has('hint-preview');
-function syncStartHint(){const hint=$('start-hint');if(!hint)return;const show=(forceStartHintPreview||shouldShowStartHint(readStartHint()))&&!machineOn&&phase==='idle'&&!batchActive&&!quickActive;hint.hidden=!show;if(show)hint.setAttribute('aria-label',START_HINT_LABEL);$('scene')?.setAttribute('aria-label',show?START_HINT_LABEL:'攪珠盤');}
-function dismissStartHint(){try{localStorage.setItem(START_HINT_KEY,startHintStoredValue());}catch{}syncStartHint();}
 function begin(){
  if(batchActive||quickActive)return;
  machineOn=true;
- dismissStartHint();
+
  clearCupBalls();quickSession=false;batchTotal=Number($('entry-count').value);batchIndex=0;batchResults=[];roundOrders=[];
  batchActive=true;$('summary').classList.remove('copy-error');resetTickets(batchTotal);$('entry-count').disabled=true;$('copy').disabled=true;timelineAt=Date.now();beginRound(true);
 }
@@ -196,7 +191,7 @@ function finishRound({skipped=false}={}){
 // Unadvertised one-ball interaction, independent of the selected ticket batch.
 function powerOn(){
  if(machineOn||batchActive||quickActive||phase==='sorting')return;
- machineOn=true;dismissStartHint();phase='running';paused=false;elapsed=0;order=[];nextIndex=0;extracting=null;timelineAt=Date.now();
+ machineOn=true;phase='running';paused=false;elapsed=0;order=[];nextIndex=0;extracting=null;timelineAt=Date.now();
  $('status').textContent='已開機';$('step').textContent='圓鼓攪拌中 · 再拍一下開始';$('instruction').textContent='機已開啟。再拍一下圓鼓，或按「開始攪」正式開攪。';setStageStatus('已開機 · 再拍圓鼓開始攪珠');
  $('start').disabled=false;$('pause').disabled=true;syncDrum();
  const firstFrame=1/60;simulate(firstFrame);rotor.rotation.z+=firstFrame*motorSpeed();updateCamera(firstFrame);renderer.render(scene,camera,true);
@@ -711,7 +706,7 @@ $('scene').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.pre
 $('copy').addEventListener('click',async()=>{if(!batchResults.length)return;const text=getTicketsCopyText()+'\n（隨機娛樂模擬，非開獎預測；特別號不是單式填寫號碼。）';const feedback=$('summary');feedback.classList.remove('copy-error');feedback.textContent='';try{await navigator.clipboard.writeText(text);$('copy').textContent='全部已複製 ✓';setTimeout(()=>$('copy').textContent='複製全部號碼 ↗',1800);}catch{feedback.textContent=text+' — 請長按選取複製。';feedback.classList.add('copy-error');}});
 document.addEventListener('visibilitychange',()=>{updateTimeline();if(document.hidden){setMotor(0);setRolling(false);}clock.getDelta();});
 resetTickets(Number($('entry-count').value));syncDrum();syncImmersiveLayout();
-try{init();syncStartHint();}catch(error){$('loading').textContent='無法啟動 3D。請使用支援 WebGL 的新版瀏覽器，並開啟硬件加速。';$('start').disabled=true;console.error(error);}
+try{init();}catch(error){$('loading').textContent='無法啟動 3D。請使用支援 WebGL 的新版瀏覽器，並開啟硬件加速。';$('start').disabled=true;console.error(error);}
 
 
 // Read-only QA diagnostics are available only when the preview URL includes ?qa=1.
