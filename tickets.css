@@ -38,29 +38,3 @@
  .rehearsal-photo-actions>*{flex:1 1 auto}.photo-pick-button{min-height:42px}
 }
 @media(max-width:380px){.ticket-entry-row{grid-template-columns:32px minmax(0,1fr) 28px;gap:4px}.ticket-number-fields{gap:3px}.ticket-number-input{height:44px;font-size:16px}.ticket-row-remove{width:28px}}
-
-/* A visible, celebratory finale: animated fireworks plus the actual drawn numbers. */
-.meditation-celebration[hidden]{display:none}
-.meditation-celebration:not([hidden]){position:fixed;inset:0;z-index:10000;display:grid;place-items:center;overflow:hidden;padding:20px;background:rgba(12,27,23,.88);}
-.fireworks{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-.firework-burst{position:absolute;left:var(--burst-x);top:var(--burst-y);width:1px;height:1px}
-.firework-burst i{position:absolute;left:0;top:0;width:4px;height:15px;border-radius:99px;background:#ffd166;box-shadow:0 0 12px currentColor;transform-origin:50% 0;animation:celebration-spark 2.6s var(--delay) ease-out infinite}
-.firework-burst i:nth-child(3n){background:#ff6b6b;color:#ff6b6b}
-.firework-burst i:nth-child(3n + 1){background:#ffe08a;color:#ffe08a}
-.firework-burst i:nth-child(3n + 2){background:#84e1bd;color:#84e1bd}
-@keyframes celebration-spark{0%{opacity:0;transform:rotate(var(--angle)) translateY(0) scale(.2)}12%{opacity:1}72%{opacity:.95;transform:rotate(var(--angle)) translateY(-clamp(36px,7vw,96px)) scale(1)}100%{opacity:0;transform:rotate(var(--angle)) translateY(-clamp(42px,8vw,112px)) scale(.45)}}
-.celebration-card{position:relative;z-index:1;width:min(100%,560px);max-height:min(92dvh,900px);overflow:auto;padding:clamp(22px,5vw,38px);border:2px solid #e1c16d;border-radius:24px;background:linear-gradient(155deg,#fffdf4 0%,#f5e9c6 100%);color:#263d31;text-align:center;box-shadow:0 24px 90px #0009;animation:celebration-arrive .7s cubic-bezier(.2,.8,.2,1) both}
-@keyframes celebration-arrive{0%{opacity:0;transform:translateY(22px) scale(.88)}100%{opacity:1;transform:translateY(0) scale(1)}}
-.celebration-badge{display:inline-block;padding:6px 14px;border-radius:999px;background:#1c6246;color:#fff8df;font-size:14px;font-weight:700;letter-spacing:.08em}
-.celebration-card h2{margin:13px 0 8px;color:#174e39;font-size:clamp(25px,6vw,38px);line-height:1.25}
-.celebration-label{margin:8px 0 12px;color:#536253;font-size:16px;font-weight:700}
-.celebration-numbers{display:flex;justify-content:center;flex-wrap:wrap;gap:clamp(5px,1.8vw,12px);margin:12px auto;}
-.celebration-ball,.celebration-special-ball{display:grid;place-items:center;width:clamp(42px,12vw,62px);aspect-ratio:1;border:2px solid #fff7da;border-radius:50%;background:radial-gradient(circle at 30% 24%,#ffe08a,#c58b2e 75%);color:#302814;font-size:clamp(19px,5vw,27px);font-weight:800;box-shadow:0 5px 12px #62471835,inset -4px -5px 8px #6d4a2928;font-variant-numeric:tabular-nums;animation:celebration-ball-pop .5s backwards}
-.celebration-ball:nth-child(2){animation-delay:.08s}.celebration-ball:nth-child(3){animation-delay:.16s}.celebration-ball:nth-child(4){animation-delay:.24s}.celebration-ball:nth-child(5){animation-delay:.32s}.celebration-ball:nth-child(6){animation-delay:.4s}
-@keyframes celebration-ball-pop{from{opacity:0;transform:translateY(12px) scale(.6)}to{opacity:1;transform:translateY(0) scale(1)}}
-.celebration-special{display:flex;justify-content:center;align-items:center;gap:10px;margin:12px 0;color:#4e5d50;font-size:15px}.celebration-special-ball{width:42px;font-size:19px;background:radial-gradient(circle at 30% 24%,#a9d9ed,#4281a6 75%);color:#fff}
-.celebration-message{max-width:440px;margin:14px auto 20px;color:#536253;font-size:15px;line-height:1.65}
-.celebration-card button{min-height:48px;padding:10px 24px;border:0;border-radius:999px;background:#1c6246;color:#fff8df;font:inherit;font-size:16px;font-weight:700;box-shadow:0 4px 0 #10442f}
-.celebration-card button:hover{background:#145238}.celebration-card button:focus-visible{outline:3px solid #c38e35;outline-offset:4px}
-@media(max-width:420px){.meditation-celebration:not([hidden]){padding:12px}.celebration-card{padding:22px 14px;border-radius:18px}.celebration-message{font-size:14px}}
-@media(prefers-reduced-motion:reduce){.firework-burst i,.celebration-card,.celebration-ball{animation:none}}
