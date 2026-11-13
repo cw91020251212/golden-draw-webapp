@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  BALLOON_PAIRS,
   CELEBRATION_HEADING,
+  CONFETTI_COLORS,
   celebrationPlan,
+  createCelebrationWorld,
   fireworkCues,
   playCelebrationAudio,
+  stepCelebration,
   synthesizeCrowd,
   synthesizeFireworkLayer
 } from './celebration.js';
@@ -73,18 +77,24 @@ test('full celebration keeps fireworks and the crowd going, and the calm plan is
   assert.equal(full.heading, '恭喜你中頭獎');
   assert.equal(CELEBRATION_HEADING, full.heading);
   assert.equal(calm.heading, CELEBRATION_HEADING);
-  assert.ok(full.applauseSeconds >= 12);
-  assert.ok(full.fadeSeconds >= 2);
-  assert.ok(full.bursts.length >= 12);
-  assert.ok(full.bursts.at(-1).t >= 10);
-  assert.ok(full.encoreUntil >= full.applauseSeconds);
-  assert.ok(full.confettiFor >= 11);
+  assert.ok(full.applauseSeconds >= 60);
+  assert.ok(full.showSeconds >= 60);
+  assert.ok(full.fadeSeconds >= 6 && full.fadeSeconds < full.applauseSeconds / 2);
+  assert.ok(full.applauseSeconds - full.fadeSeconds >= 58);
+  assert.ok(full.bursts.length >= 30);
+  assert.ok(full.bursts.at(-1).t >= 55);
+  assert.ok(full.encoreUntil >= 60);
+  assert.ok(full.confettiFor >= 60);
+  assert.ok(full.confettiPerSecond >= 12);
   assert.ok(full.launchLead >= 0.4 && full.launchLead <= 0.6);
-  assert.ok(calm.applauseSeconds >= 4.5);
+  assert.ok(calm.applauseSeconds >= 8);
+  assert.ok(calm.applauseSeconds < 20);
   assert.ok(calm.applauseSeconds < full.applauseSeconds);
-  assert.ok(calm.fadeSeconds >= 1);
+  assert.ok(calm.fadeSeconds >= 2.5);
+  assert.ok(calm.showSeconds >= calm.applauseSeconds - 1);
+  assert.ok(calm.confettiFor >= calm.showSeconds);
   assert.ok(calm.bursts.length >= 2);
-  assert.ok(calm.balloonCount > 0);
+  assert.ok(calm.balloonCount >= BALLOON_PAIRS.length);
 
   const cues = fireworkCues(full);
   const booms = cues.filter(cue => cue.type === 'boom');
@@ -92,7 +102,11 @@ test('full celebration keeps fireworks and the crowd going, and the calm plan is
   assert.ok(booms.length >= 12);
   assert.ok(booms.every(cue => cue.tail >= 0.55 && cue.crackle >= 100));
   assert.ok(Math.min(...booms.map(cue => cue.t)) < 1);
-  assert.ok(Math.max(...booms.map(cue => cue.t)) > 10);
+  assert.ok(Math.max(...booms.map(cue => cue.t)) > 55);
+  const times = booms.map(cue => cue.t).sort((a, b) => a - b);
+  let maxGap = 0;
+  for (let i = 1; i < times.length; i++) maxGap = Math.max(maxGap, times[i] - times[i - 1]);
+  assert.ok(maxGap < 2.2);
   assert.equal(full.bursts.some(burst => burst.whistle), false);
   const calmCues = fireworkCues(calm);
   assert.ok(calmCues.every(cue => cue.type === 'boom'));
@@ -103,17 +117,21 @@ test('applause and cheers stay loud well past a short clap, then fade', () => {
   const plan = celebrationPlan(false);
   const { left, cheerTimes } = synthesizeCrowd(8000, plan.applauseSeconds, plan.fadeSeconds, lcg(11));
   assert.equal(left.length, Math.floor(8000 * plan.applauseSeconds));
-  const early = rms(slice(left, 8000, 1.2, 2.4));
-  const middle = rms(slice(left, 8000, 5.5, 6.8));
-  const late = rms(slice(left, 8000, 8.4, 9.6));
-  const tail = rms(slice(left, 8000, plan.applauseSeconds - 0.45, plan.applauseSeconds));
+  const early = rms(slice(left, 8000, 2, 4));
+  const middle = rms(slice(left, 8000, 28, 32));
+  const late = rms(slice(left, 8000, 52, 56));
+  const minute = rms(slice(left, 8000, 58, 60));
+  const easing = rms(slice(left, 8000, 61.5, 63.5));
+  const tail = rms(slice(left, 8000, plan.applauseSeconds - 0.4, plan.applauseSeconds));
   assert.ok(early > 0.04);
   assert.ok(middle > early * 0.55);
-  assert.ok(late > early * 0.45);
-  assert.ok(tail < late * 0.45);
-  assert.ok(cheerTimes.length >= 8);
-  assert.ok(cheerTimes.some(time => time > 8));
-  const cheerAt = cheerTimes.find(time => time > 4 && time < 7);
+  assert.ok(late > early * 0.5);
+  assert.ok(minute > early * 0.45);
+  assert.ok(easing > tail * 3);
+  assert.ok(tail < late * 0.35);
+  assert.ok(cheerTimes.length >= 20);
+  assert.ok(cheerTimes.some(time => time > 45));
+  const cheerAt = cheerTimes.find(time => time > 20 && time < 40);
   const cheer = slice(left, 8000, cheerAt, cheerAt + 0.4);
   assert.ok(rms(cheer) > 0.04);
   assert.ok(periodScore(cheer, 8000, 200, 2500) < 0.28);
@@ -181,14 +199,16 @@ test('firework shells are booms with crackle trails and no siren or beep', () =>
   const rumble = rms(slice(left, rate, 0.55, 0.85));
   assert.ok(rumble > rms(slice(pop, rate, 0.55, 0.85)) * 4);
 
-  const show = synthesizeFireworkLayer(rate, celebrationPlan(false).applauseSeconds, fireworkCues(celebrationPlan(false)), lcg(1));
+  const showPlan = celebrationPlan(false);
+  const show = synthesizeFireworkLayer(rate, showPlan.applauseSeconds, fireworkCues(showPlan), lcg(1));
   let showTone = 0;
-  for (let t = 0.2; t < 12; t += 0.12) {
+  for (let t = 0.2; t < showPlan.applauseSeconds - 0.5; t += 0.45) {
     const window = slice(show.left, rate, t, t + 0.09);
     if (rms(window) < 0.02) continue;
     showTone = Math.max(showTone, toneOf(window));
   }
   assert.ok(showTone < 0.4);
+  assert.ok(rms(slice(show.left, rate, 50, 54)) > 0.02);
 });
 
 test('dismiss fades and stops both the crowd and the fireworks', () => {
@@ -249,7 +269,7 @@ test('dismiss fades and stops both the crowd and the fireworks', () => {
   assert.equal(sources.length, 2);
   assert.equal(sources[0].started, 3);
   assert.equal(sources[1].started, 3);
-  assert.ok(sources.every(source => source.buffer.length >= 8000 * 12));
+  assert.ok(sources.every(source => source.buffer.length >= 8000 * 60));
   assert.ok(playing.cues.some(cue => cue.type === 'boom'));
   assert.ok(playing.cues.every(cue => cue.type === 'boom'));
   assert.ok(connections.includes(destination));
@@ -266,4 +286,92 @@ test('dismiss fades and stops both the crowd and the fireworks', () => {
   const missing = playCelebrationAudio(null, plan);
   assert.equal(missing.started, false);
   missing.stop();
+});
+
+function rgb(hex) {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+test('balloons are mixed colors, confetti keeps falling, and debris stays on the ground', () => {
+  const families = new Set(BALLOON_PAIRS.map(pair => pair.family));
+  for (const name of ['red', 'gold', 'purple', 'blue', 'green', 'cream']) assert.ok(families.has(name));
+  for (let i = 0; i < BALLOON_PAIRS.length; i++) {
+    for (let j = i + 1; j < BALLOON_PAIRS.length; j++) {
+      const a = rgb(BALLOON_PAIRS[i].color);
+      const b = rgb(BALLOON_PAIRS[j].color);
+      const gap = Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
+      assert.ok(gap > 40);
+    }
+  }
+  const confettiFamilies = new Set(CONFETTI_COLORS.map(swatch => swatch.family));
+  assert.ok(confettiFamilies.size >= 6);
+
+  const full = celebrationPlan(false);
+  const world = createCelebrationWorld(full, 900, 640, lcg(4));
+  assert.equal(new Set(world.balloons.map(balloon => balloon.family)).size, BALLOON_PAIRS.length);
+  const leftFamilies = new Set(world.balloons.filter((_, index) => index % 2 === 0).map(balloon => balloon.family));
+  const rightFamilies = new Set(world.balloons.filter((_, index) => index % 2 === 1).map(balloon => balloon.family));
+  assert.ok(leftFamilies.size >= 3);
+  assert.ok(rightFamilies.size >= 3);
+
+  let t = 0;
+  const dt = 1 / 30;
+  while (t < 6) {
+    stepCelebration(world, dt, t);
+    t += dt;
+  }
+  const settled = world.debris.filter(bit => bit.settled);
+  assert.ok(settled.length >= 20);
+  assert.ok(settled.every(bit => bit.y > 640 * 0.7));
+  const debrisFamilies = new Set(settled.map(bit => bit.family));
+  assert.ok(debrisFamilies.has('red'));
+  assert.ok(debrisFamilies.has('purple'));
+  assert.ok(debrisFamilies.has('gold'));
+  assert.ok(settled.some(bit => bit.kind === 'paper'));
+  assert.ok(settled.some(bit => bit.kind === 'powder'));
+  const kept = settled.map(bit => ({ id: bit.id, y: bit.y }));
+  assert.ok(world.confetti.length > 20);
+  const confettiSeen = new Set(world.confetti.map(bit => bit.family));
+  assert.ok(confettiSeen.size >= 4);
+  const fallsAt6 = world.confettiFalls;
+
+  while (t < 50) {
+    stepCelebration(world, dt, t);
+    t += dt;
+  }
+  for (const bit of kept) {
+    const found = world.debris.find(item => item.id === bit.id);
+    assert.ok(found && found.settled);
+    assert.equal(found.y, bit.y);
+  }
+  assert.ok(world.debris.filter(bit => bit.settled).length >= kept.length);
+  assert.ok(world.confetti.length > 20);
+  assert.ok(world.confettiFalls > fallsAt6 + 10);
+  const fallsAt50 = world.confettiFalls;
+  const sample = world.confetti.find(bit => bit.y > 40 && bit.y < 500);
+  const y0 = sample.y;
+  stepCelebration(world, dt, t);
+  t += dt;
+  assert.ok(sample.y > y0);
+  while (t < 59) {
+    stepCelebration(world, dt, t);
+    t += dt;
+  }
+  assert.ok(world.confettiFalls > fallsAt50);
+  assert.ok(world.confetti.length > 15);
+  assert.ok(world.launched.size >= 30);
+
+  const calm = celebrationPlan(true);
+  const calmWorld = createCelebrationWorld(calm, 900, 640, lcg(8));
+  assert.equal(new Set(calmWorld.balloons.map(balloon => balloon.family)).size, BALLOON_PAIRS.length);
+  let calmT = 0;
+  while (calmT < 5) {
+    stepCelebration(calmWorld, dt, calmT);
+    calmT += dt;
+  }
+  const calmDebris = calmWorld.debris.filter(bit => bit.settled);
+  assert.ok(calmDebris.length >= 8);
+  assert.ok(new Set(calmDebris.map(bit => bit.family)).size >= 3);
+  assert.ok(calmWorld.confetti.length > 8);
 });
