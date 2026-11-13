@@ -1,7 +1,7 @@
 // End-of-rehearsal celebration: canvas fireworks, balloons and confetti in the
 // house gold palette. Audio is synthesized in the page's AudioContext and mixed
-// on top of the existing soundtrack: aerial fireworks (boom, crackle, whistle)
-// plus a long applause-and-cheers bed. Nothing here is a recording.
+// on top of the existing soundtrack: aerial fireworks (boom and crackle only)
+// plus a long applause-and-cheers bed. No whistles, glides, or beeps.
 export const CELEBRATION_HEADING = '恭喜你中頭獎';
 
 const GOLD = ['#fff6d4', '#ffe7a4', '#f8dc8a', '#e8c36a', '#d7a441', '#c4a15a', '#a98442', '#8a6424', '#f4f1e9'];
@@ -22,7 +22,7 @@ export function celebrationPlan(reduced) {
       fadeSeconds: 1.35,
       launchLead: 0,
       bursts: [
-        { t: 0.08, x: 0.34, y: 0.28, power: 0.85, kind: 'still', whistle: true },
+        { t: 0.08, x: 0.34, y: 0.28, power: 0.85, kind: 'still' },
         { t: 0.85, x: 0.66, y: 0.26, power: 0.75, kind: 'still' },
         { t: 1.55, x: 0.5, y: 0.24, power: 0.9, kind: 'still' }
       ],
@@ -39,16 +39,16 @@ export function celebrationPlan(reduced) {
     fadeSeconds: 2.5,
     launchLead: 0.48,
     bursts: [
-      { t: 0.12, x: 0.22, y: 0.24, power: 0.95, kind: 'peony', whistle: true },
+      { t: 0.12, x: 0.22, y: 0.24, power: 0.95, kind: 'peony' },
       { t: 0.62, x: 0.78, y: 0.2, power: 0.9, kind: 'peony' },
       { t: 1.25, x: 0.5, y: 0.16, power: 1.15, kind: 'crown' },
       { t: 2.15, x: 0.3, y: 0.3, power: 0.85, kind: 'willow' },
       { t: 2.85, x: 0.72, y: 0.26, power: 1, kind: 'peony' },
-      { t: 3.6, x: 0.16, y: 0.22, power: 0.8, kind: 'peony', whistle: true },
+      { t: 3.6, x: 0.16, y: 0.22, power: 0.8, kind: 'peony' },
       { t: 4.45, x: 0.84, y: 0.28, power: 0.95, kind: 'willow' },
       { t: 5.25, x: 0.48, y: 0.18, power: 1.2, kind: 'crown' },
       { t: 6.15, x: 0.28, y: 0.27, power: 0.85, kind: 'peony' },
-      { t: 7.05, x: 0.7, y: 0.22, power: 1, kind: 'crown', whistle: true },
+      { t: 7.05, x: 0.7, y: 0.22, power: 1, kind: 'crown' },
       { t: 8.05, x: 0.38, y: 0.24, power: 0.9, kind: 'peony' },
       { t: 8.95, x: 0.62, y: 0.2, power: 0.95, kind: 'willow' },
       { t: 9.9, x: 0.5, y: 0.16, power: 1.15, kind: 'crown' },
@@ -129,35 +129,32 @@ function bandpass(freq, q, sampleRate) {
   };
 }
 
-// Aerial shell: a pitch-dropping sub and a lowpass that sweeps from a bright
-// report down into rumble, then a long trail of mid crackles and high sparks.
-// A balloon pop is only the bright report and dies within a few dozen milliseconds.
+// Aerial shell made only of noise: a low rumble, a short bright report, then
+// crackle. No oscillators, so there is no whistle, falling tone, or beep.
 function writeBoom(left, right, sampleRate, startSec, power, pan, random, shell) {
   const tail = shell.tail;
   const n = Math.floor(sampleRate * tail);
   const start = Math.floor(startSec * sampleRate);
-  let lp = 0;
+  let rumble = 0;
+  let body = 0;
   let hp = 0;
   let prev = 0;
-  let phase = 0;
-  const f0 = 88 + random() * 36;
-  const weight = 0.82 * power * shell.boom;
-  const hpA = Math.exp(-2 * Math.PI * 28 / sampleRate);
+  const weight = 0.9 * power * shell.boom;
+  const hpA = Math.exp(-2 * Math.PI * 30 / sampleRate);
+  const rumbleA = 1 - Math.exp(-2 * Math.PI * 110 / sampleRate);
   for (let i = 0; i < n; i++) {
     const t = i / sampleRate;
-    const cutoff = 62 + 2600 * Math.exp(-t / 0.065);
-    const a = 1 - Math.exp(-2 * Math.PI * Math.min(cutoff, sampleRate * 0.45) / sampleRate);
+    const cutoff = 90 + 1800 * Math.exp(-t / 0.045);
+    const bodyA = 1 - Math.exp(-2 * Math.PI * Math.min(cutoff, sampleRate * 0.45) / sampleRate);
     const white = random() * 2 - 1;
     hp = hpA * (hp + white - prev);
     prev = white;
-    lp += a * (hp - lp);
-    const bodyEnv = Math.exp(-t / 0.12);
-    const f = 40 + (f0 - 40) * Math.exp(-t / 0.09);
-    phase += 2 * Math.PI * f / sampleRate;
-    const subEnv = Math.exp(-t / 0.16);
-    const sub = (Math.sin(phase) * 0.34 + Math.sin(phase * 0.5) * 0.14) * subEnv;
-    const crack = t < 0.04 ? (white - lp) * Math.exp(-t / 0.011) * 0.2 : 0;
-    addSample(left, right, start + i, (lp * bodyEnv * 1.25 + sub + crack) * weight, pan);
+    rumble += rumbleA * (hp - rumble);
+    body += bodyA * (hp - body);
+    const thud = rumble * Math.exp(-t / 0.2) * 1.35;
+    const report = body * Math.exp(-t / 0.07) * 0.55;
+    const crack = t < 0.035 ? (white - body) * Math.exp(-t / 0.01) * 0.16 : 0;
+    addSample(left, right, start + i, (thud + report + crack) * weight, pan);
   }
   const sparks = Math.max(12, Math.round(shell.crackle * power));
   for (let s = 0; s < sparks; s++) {
@@ -183,26 +180,6 @@ function writeBoom(left, right, sampleRate, startSec, power, pan, random, shell)
   }
 }
 
-function writeWhistle(left, right, sampleRate, startSec, dur, pan, power, random) {
-  const n = Math.max(2, Math.floor(sampleRate * dur));
-  const start = Math.floor(startSec * sampleRate);
-  let phase = 0;
-  let air = 0;
-  const fStart = 640 + random() * 160;
-  const fEnd = 2000 + random() * 640;
-  for (let i = 0; i < n; i++) {
-    const u = i / n;
-    const f = fStart * Math.pow(fEnd / fStart, Math.min(1, u / 0.92));
-    const vib = Math.sin(2 * Math.PI * 11 * (i / sampleRate)) * f * 0.007;
-    phase += 2 * Math.PI * (f + vib) / sampleRate;
-    const reed = Math.tanh(2.6 * Math.sin(phase));
-    const white = random() * 2 - 1;
-    air = air * 0.72 + white * 0.28;
-    const env = Math.sin(Math.min(1, u / 0.1) * Math.PI * 0.5) * (u > 0.84 ? (1 - u) / 0.16 : 1);
-    addSample(left, right, start + i, (reed * 0.78 + air * 0.16) * env * 0.48 * power, pan);
-  }
-}
-
 export function fireworkCues(plan) {
   const lead = plan.launchLead || 0;
   const calm = !!plan.reduced;
@@ -210,33 +187,17 @@ export function fireworkCues(plan) {
   for (const burst of plan.bursts) {
     const shell = SHELL[burst.kind] || SHELL.peony;
     const scale = calm ? 0.62 : 1;
-    if (burst.whistle) {
-      const dur = lead > 0 ? lead : 0.42;
-      cues.push({ t: burst.t, type: 'whistle', dur, pan: burst.x, power: burst.power });
-      cues.push({
-        t: burst.t + dur * 0.94,
-        type: 'boom',
-        pan: burst.x,
-        power: burst.power,
-        tail: shell.tail * (calm ? 0.8 : 1),
-        crackle: Math.round(shell.crackle * scale),
-        spread: shell.spread,
-        boom: shell.boom,
-        crown: burst.kind === 'crown' && !calm
-      });
-    } else {
-      cues.push({
-        t: burst.t + lead,
-        type: 'boom',
-        pan: burst.x,
-        power: burst.power,
-        tail: shell.tail * (calm ? 0.8 : 1),
-        crackle: Math.round(shell.crackle * scale),
-        spread: shell.spread,
-        boom: shell.boom,
-        crown: burst.kind === 'crown' && !calm
-      });
-    }
+    cues.push({
+      t: burst.t + lead,
+      type: 'boom',
+      pan: burst.x,
+      power: burst.power,
+      tail: shell.tail * (calm ? 0.8 : 1),
+      crackle: Math.round(shell.crackle * scale),
+      spread: shell.spread,
+      boom: shell.boom,
+      crown: burst.kind === 'crown' && !calm
+    });
   }
   const withCrown = [];
   for (const cue of cues) {
@@ -259,47 +220,39 @@ export function synthesizeFireworkLayer(sampleRate, seconds, cues, random = Math
   const total = Math.max(1, Math.floor(sampleRate * seconds));
   const left = new Float32Array(total);
   const right = new Float32Array(total);
-  for (const cue of cues) {
-    if (cue.type === 'whistle') writeWhistle(left, right, sampleRate, cue.t, cue.dur, cue.pan, cue.power, random);
-    else writeBoom(left, right, sampleRate, cue.t, cue.power, cue.pan, random, cue);
-  }
+  for (const cue of cues) writeBoom(left, right, sampleRate, cue.t, cue.power, cue.pan, random, cue);
   fadeEdges(left, right, sampleRate, 0.012, 0.4);
   const peak = softenAndNormalize(left, right, 0.9);
   return { left, right, peak };
 }
 
-const CHEER = [
-  { f0: 188, f1: 276, formants: [430, 880, 2140], dur: 0.64 },
-  { f0: 246, f1: 430, formants: [540, 1680, 2580], dur: 0.36 },
-  { f0: 156, f1: 214, formants: [700, 1220, 2460], dur: 0.72 }
+// A cheer is a swell of colored noise, like a group shouting, with no pitch.
+const CHEER_BANDS = [
+  [420, 980],
+  [520, 1400],
+  [360, 860]
 ];
 
 function writeCheer(left, right, sampleRate, startSec, random) {
-  const style = CHEER[Math.floor(random() * CHEER.length)];
-  const dur = style.dur * (0.88 + random() * 0.28);
+  const bands = CHEER_BANDS[Math.floor(random() * CHEER_BANDS.length)];
+  const dur = 0.55 + random() * 0.5;
   const n = Math.floor(sampleRate * dur);
   const start = Math.floor(startSec * sampleRate);
-  const voices = style.formants.map((freq, index) => bandpass(freq, index === 0 ? 4.2 : 6.2, sampleRate));
-  let phase = 0;
-  const pan = 0.28 + random() * 0.44;
-  const amp = 0.34 + random() * 0.16;
+  const low = bandpass(bands[0], 1.4, sampleRate);
+  const high = bandpass(bands[1], 1.15, sampleRate);
+  const pan = 0.22 + random() * 0.56;
+  const amp = 0.42 + random() * 0.2;
   for (let i = 0; i < n; i++) {
     const u = i / n;
-    const f0 = style.f0 + (style.f1 - style.f0) * Math.sin(Math.PI * Math.min(1, u));
-    const vib = Math.sin(2 * Math.PI * 5.2 * (i / sampleRate)) * f0 * 0.016;
-    phase += 2 * Math.PI * (f0 + vib) / sampleRate;
-    const saw = 2 * ((phase / (2 * Math.PI)) % 1) - 1;
-    const excite = Math.tanh(saw * 1.35);
-    let y = 0;
-    for (const voice of voices) y += voice.process(excite);
-    const pulse = Math.sin(phase) * 0.55 + Math.sin(phase * 2) * 0.18;
-    const env = Math.sin(Math.min(1, u / 0.16) * Math.PI * 0.5) * Math.pow(1 - u, 0.62);
-    addSample(left, right, start + i, (y * 0.85 + pulse) * env * amp * 0.72, pan);
+    const env = Math.sin(Math.min(1, u / 0.22) * Math.PI * 0.5) * Math.pow(1 - u, 0.7);
+    const white = random() * 2 - 1;
+    const shout = low.process(white) * 0.85 + high.process(white) * 0.45;
+    addSample(left, right, start + i, shout * env * amp, pan);
   }
 }
 
-// Dense overlapping claps plus pitched cheers. The bed stays continuous so it
-// reads as a crowd, not as separate balloon-like pops.
+// Dense overlapping claps plus unpitched cheer swells. The bed stays continuous
+// so it reads as a crowd, not as separate pops or beeps.
 export function synthesizeCrowd(sampleRate, seconds, fadeSeconds, random = Math.random) {
   const total = Math.max(1, Math.floor(sampleRate * seconds));
   const left = new Float32Array(total);

@@ -88,20 +88,15 @@ test('full celebration keeps fireworks and the crowd going, and the calm plan is
 
   const cues = fireworkCues(full);
   const booms = cues.filter(cue => cue.type === 'boom');
-  const whistles = cues.filter(cue => cue.type === 'whistle');
+  assert.equal(cues.length, booms.length);
   assert.ok(booms.length >= 12);
-  assert.ok(whistles.length >= 3);
   assert.ok(booms.every(cue => cue.tail >= 0.55 && cue.crackle >= 100));
-  assert.ok(Math.min(...cues.map(cue => cue.t)) < 0.2);
+  assert.ok(Math.min(...booms.map(cue => cue.t)) < 1);
   assert.ok(Math.max(...booms.map(cue => cue.t)) > 10);
-  const whistled = full.bursts.find(burst => burst.whistle);
-  const whistle = whistles.find(cue => cue.t === whistled.t);
-  const matchingBoom = booms.find(cue => Math.abs(cue.t - (whistled.t + whistle.dur * 0.94)) < 0.02);
-  assert.ok(whistle);
-  assert.ok(matchingBoom);
+  assert.equal(full.bursts.some(burst => burst.whistle), false);
   const calmCues = fireworkCues(calm);
-  assert.ok(calmCues.some(cue => cue.type === 'whistle'));
-  assert.ok(calmCues.some(cue => cue.type === 'boom' && cue.crackle >= 40 && cue.tail >= 0.4));
+  assert.ok(calmCues.every(cue => cue.type === 'boom'));
+  assert.ok(calmCues.some(cue => cue.crackle >= 40 && cue.tail >= 0.4));
 });
 
 test('applause and cheers stay loud well past a short clap, then fade', () => {
@@ -119,27 +114,50 @@ test('applause and cheers stay loud well past a short clap, then fade', () => {
   assert.ok(cheerTimes.length >= 8);
   assert.ok(cheerTimes.some(time => time > 8));
   const cheerAt = cheerTimes.find(time => time > 4 && time < 7);
-  const cheerScore = periodScore(slice(left, 8000, cheerAt + 0.06, cheerAt + 0.22), 8000, 120, 520);
-  assert.ok(cheerScore > 0.2);
+  const cheer = slice(left, 8000, cheerAt, cheerAt + 0.4);
+  assert.ok(rms(cheer) > 0.04);
+  assert.ok(periodScore(cheer, 8000, 200, 2500) < 0.28);
 });
 
-test('firework shells are booms with crackle trails and a rising whistle, not balloon pops', () => {
+test('firework shells are booms with crackle trails and no siren or beep', () => {
   const rate = 8000;
   const cues = [
-    { t: 0.12, type: 'whistle', dur: 0.48, pan: 0.35, power: 1 },
-    { t: 0.58, type: 'boom', pan: 0.35, power: 1, tail: 1.15, crackle: 420, spread: 1.6, boom: 1, crown: false }
+    { t: 0.4, type: 'boom', pan: 0.35, power: 1, tail: 1.15, crackle: 160, spread: 1.45, boom: 1, crown: false }
   ];
   const { left } = synthesizeFireworkLayer(rate, 2.2, cues, lcg(5));
-  const whistle = slice(left, rate, 0.22, 0.28);
-  assert.ok(periodScore(whistle, rate, 500, 2800) > 0.7);
-  assert.ok(rms(whistle) > 0.02);
+  const toneOf = samples => {
+    const high = new Float32Array(samples.length);
+    const coeff = Math.exp(-2 * Math.PI * 450 / rate);
+    let state = 0;
+    let prev = 0;
+    for (let i = 0; i < samples.length; i++) {
+      state = coeff * (state + samples[i] - prev);
+      prev = samples[i];
+      high[i] = state;
+    }
+    return periodScore(high, rate, 400, 2200);
+  };
+  let peakTone = 0;
+  for (let t = 0.2; t < 1.8; t += 0.08) {
+    const window = slice(left, rate, t, t + 0.09);
+    if (rms(window) < 0.02) continue;
+    peakTone = Math.max(peakTone, toneOf(window));
+  }
+  const beep = new Float32Array(Math.floor(rate * 0.09));
+  let phase = 0;
+  for (let i = 0; i < beep.length; i++) {
+    phase += 2 * Math.PI * 880 / rate;
+    beep[i] = Math.sin(phase);
+  }
+  assert.ok(toneOf(beep) > 0.8);
+  assert.ok(peakTone < 0.4);
 
-  const attack = slice(left, rate, 0.58, 0.7);
+  const attack = slice(left, rate, 0.4, 0.52);
   const lowShare = lowpassRms(attack, rate, 140) / rms(attack);
   assert.ok(lowShare > 0.22);
 
   const pop = new Float32Array(left.length);
-  const popStart = Math.floor(0.58 * rate);
+  const popStart = Math.floor(0.4 * rate);
   const popDur = Math.floor(rate * 0.022);
   let seed = 9;
   for (let i = 0; i < popDur; i++) {
@@ -148,20 +166,29 @@ test('firework shells are booms with crackle trails and a rising whistle, not ba
     pop[popStart + i] = noise * Math.pow(1 - i / popDur, 1.7);
   }
   for (let i = pop.length - 1; i > 0; i--) pop[i] = pop[i] - pop[i - 1] * 0.85;
-  const popAttack = slice(pop, rate, 0.58, 0.7);
+  const popAttack = slice(pop, rate, 0.4, 0.52);
   const popLowShare = lowpassRms(popAttack, rate, 140) / Math.max(1e-9, rms(popAttack));
   assert.ok(lowShare > popLowShare * 1.8);
 
   let lively = 0;
-  for (let t = 0.78; t < 1.45; t += 0.07) {
+  for (let t = 0.62; t < 1.3; t += 0.07) {
     if (highpassEnergy(slice(left, rate, t, t + 0.06)) > 1e-5) lively += 1;
   }
   assert.ok(lively >= 6);
-  const trail = highpassEnergy(slice(left, rate, 0.85, 1.35));
-  const popTrail = highpassEnergy(slice(pop, rate, 0.85, 1.35));
+  const trail = highpassEnergy(slice(left, rate, 0.7, 1.2));
+  const popTrail = highpassEnergy(slice(pop, rate, 0.7, 1.2));
   assert.ok(trail > popTrail * 8);
-  const rumble = rms(slice(left, rate, 0.72, 1.02));
-  assert.ok(rumble > rms(slice(pop, rate, 0.72, 1.02)) * 4);
+  const rumble = rms(slice(left, rate, 0.55, 0.85));
+  assert.ok(rumble > rms(slice(pop, rate, 0.55, 0.85)) * 4);
+
+  const show = synthesizeFireworkLayer(rate, celebrationPlan(false).applauseSeconds, fireworkCues(celebrationPlan(false)), lcg(1));
+  let showTone = 0;
+  for (let t = 0.2; t < 12; t += 0.12) {
+    const window = slice(show.left, rate, t, t + 0.09);
+    if (rms(window) < 0.02) continue;
+    showTone = Math.max(showTone, toneOf(window));
+  }
+  assert.ok(showTone < 0.4);
 });
 
 test('dismiss fades and stops both the crowd and the fireworks', () => {
@@ -224,7 +251,7 @@ test('dismiss fades and stops both the crowd and the fireworks', () => {
   assert.equal(sources[1].started, 3);
   assert.ok(sources.every(source => source.buffer.length >= 8000 * 12));
   assert.ok(playing.cues.some(cue => cue.type === 'boom'));
-  assert.ok(playing.cues.some(cue => cue.type === 'whistle'));
+  assert.ok(playing.cues.every(cue => cue.type === 'boom'));
   assert.ok(connections.includes(destination));
   assert.ok(connections.every(dest => dest === destination || gains.includes(dest)));
   const master = gains.find(gain => gain.gain.events.some(event => event.type === 'set' && event.value === 1));
