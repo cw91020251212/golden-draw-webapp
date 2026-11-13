@@ -53,23 +53,48 @@ export function parseTicketEntries(text) {
 
 export function extractTicketRowsFromOcr(text) {
   const rows = [];
-  let plusSeparatedRows = 0;
+  let plusSeparatedLines = 0;
   for (const line of String(text || '').split(/\r?\n/)) {
-    const plusSeparated = (line.match(/\+/g) || []).length >= 5;
+    const plusSeparated = (line.match(/\+/g) || []).length >= 3;
     const hasSlashPrefix = /^\s*\//.test(line);
     let normalizedLine = line.trim().replace(/^[\s/]+/, '');
     let values = (normalizedLine.match(/\d{1,2}/g) || []).map(Number);
     // HKJC ticket rows after the first start with `/`; OCR can mistake that slash for `1`.
-    if (plusSeparated && plusSeparatedRows > 0 && !hasSlashPrefix && normalizedLine.startsWith('1')) {
+    if (!isValidEntry(values) && plusSeparated && plusSeparatedLines > 0 && !hasSlashPrefix && /^1\d/.test(normalizedLine)) {
       const withoutSlashArtifact = (normalizedLine.slice(1).match(/\d{1,2}/g) || []).map(Number);
       if (isValidEntry(withoutSlashArtifact)) values = withoutSlashArtifact;
     }
-    if (isValidEntry(values)) {
-      rows.push(values);
-      if (plusSeparated) plusSeparatedRows += 1;
-    }
+    if (isValidEntry(values)) rows.push(values);
+    if (plusSeparated) plusSeparatedLines += 1;
   }
   return rows;
+}
+
+export function mergeTicketRows(primary, supplemental) {
+  const equal = (a, b) => a.length === b.length && a.every((n, i) => n === b[i]);
+  const a = (Array.isArray(primary) ? primary : []).filter(isValidEntry);
+  const b = (Array.isArray(supplemental) ? supplemental : []).filter(isValidEntry);
+  const lcs = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      lcs[i][j] = equal(a[i], b[j]) ? 1 + lcs[i + 1][j + 1] : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+
+  const merged = [];
+  let i = 0, j = 0;
+  while (i < a.length && j < b.length) {
+    if (equal(a[i], b[j])) {
+      merged.push(a[i++]); j++;
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+      merged.push(a[i++]);
+    } else {
+      merged.push(b[j++]);
+    }
+  }
+  while (i < a.length) merged.push(a[i++]);
+  while (j < b.length) merged.push(b[j++]);
+  return merged;
 }
 
 export function buildRehearsalOrder(chosen, randomBelow) {

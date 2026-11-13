@@ -9,7 +9,7 @@ import { sceneTapAction } from './scene-tap.js?v=local-preview-reveal-skip-1';
 import { lineupSlots } from './lineup.js?v=tv-reveal-1';
 import {CompatibleRenderer} from './compat.js?v=ref-shot-27';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
-import {MAX_REHEARSAL_ENTRIES,parseTicketFields,extractTicketRowsFromOcr,buildRehearsalOrder} from './ticket-input.js?v=ticket-grid-2';
+import {MAX_REHEARSAL_ENTRIES,parseTicketFields,extractTicketRowsFromOcr,mergeTicketRows,buildRehearsalOrder}from './ticket-input.js?v=ticket-grid-4';
 import {MUSIC_STORAGE_KEY,DEFAULT_TRACK_URL,DEFAULT_TRACK_NAME,MUSIC_LOOPS,clampVolume,readMusicPrefs,writeMusicPrefs,musicControlState} from './music-panel.js?v=music-panel-1';
 const $=id=>document.getElementById(id);
 const reds=new Set([1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46]);
@@ -656,7 +656,64 @@ if(ticketRowsHost&&!ticketRowsHost.children.length)appendTicketEntryRow();
 $('ticket-add')?.addEventListener('click',()=>{const row=appendTicketEntryRow([],true);if(!row&&$('meditation-status'))$('meditation-status').textContent='每次彩排最多 100 注。';});
 $('meditation-rehearse')?.addEventListener('click',()=>{if(batchActive||quickActive)return;const status=$('meditation-status');try{rehearsalEntries=parseTicketFields(getTicketFieldRows());}catch(error){if(status)status.textContent=error.message;focusTicketInputForError(error);return;}meditationRehearsalActive=true;prizeTicketIndex=uniform(rehearsalEntries.length);rehearsalOrder=buildRehearsalOrder(rehearsalEntries[prizeTicketIndex],uniform);begin();});
 let ocrScriptPromise=null;function loadTesseract(){if(window.Tesseract)return Promise.resolve(window.Tesseract);if(!ocrScriptPromise)ocrScriptPromise=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';script.async=true;script.onload=()=>resolve(window.Tesseract);script.onerror=()=>{ocrScriptPromise=null;reject(new Error('OCR 引擎載入失敗，請檢查網絡或改為手動輸入。'));};document.head.append(script);});return ocrScriptPromise;}
-$('recognize-ticket-photo')?.addEventListener('click',async()=>{const file=$('ticket-photo')?.files?.[0],status=$('meditation-status'),button=$('recognize-ticket-photo');if(!file){if(status)status.textContent='請先拍攝或選擇一張六合彩相片。';return;}const originalLabel=button.textContent;button.disabled=true;button.textContent='載入中…';let worker;try{if(status)status.textContent='正在載入 OCR，首次使用可能需要數秒。';const api=await loadTesseract();worker=await api.createWorker('eng',1,{logger:m=>{if(!status)return;if(m.status==='recognizing text'){const percent=Math.round((m.progress||0)*100);status.textContent=`正在辨識號碼 ${percent}%…`;button.textContent=`辨識 ${percent}%`;}else if(m.status==='loading language traineddata'||m.status==='loading tesseract core'){status.textContent='正在載入 OCR 引擎…';button.textContent='載入中…';}}});await worker.setParameters({tessedit_char_whitelist:'0123456789+/',preserve_interword_spaces:'1'});const result=await worker.recognize(file),rows=extractTicketRowsFromOcr(result.data.text);const raw=$('ocr-raw');if(raw)raw.textContent=result.data.text||'（未辨識到文字）';const rawDetails=$('ocr-details');if(rawDetails)rawDetails.hidden=false;if(rows.length>MAX_REHEARSAL_ENTRIES){if(status)status.textContent='相片辨識超過 100 注，請分批辨識。';return;}setTicketGridRows(rows);if(status)status.textContent=rows.length?`相片辨識到 ${rows.length} 注；已填入六格，可逐格核對或修改。`:'未辨識到完整注數；請確保相片正面清晰，或手動輸入。';}catch(error){if(status)status.textContent=error.message||'相片辨識失敗，請改為手動輸入。';}finally{try{if(worker)await worker.terminate();}catch{}button.disabled=false;button.textContent=originalLabel;}});
+$('recognize-ticket-photo')?.addEventListener('click',async()=>{
+ const file=$('ticket-photo')?.files?.[0],status=$('meditation-status'),button=$('recognize-ticket-photo');
+ if(!file){if(status)status.textContent='請先拍攝或選擇一張六合彩相片。';return;}
+ const originalLabel=button.textContent;button.disabled=true;button.textContent='載入中…';let worker;
+ try{
+  if(status)status.textContent='正在載入 OCR，首次使用可能需要數秒。';
+  const api=await loadTesseract();
+  worker=await api.createWorker('eng',1,{logger:m=>{if(!status)return;if(m.status==='recognizing text'){const percent=Math.round((m.progress||0)*100);status.textContent=`正在辨識號碼 ${percent}%…`;button.textContent=`辨識 ${percent}%`;}else if(m.status==='loading language traineddata'||m.status==='loading tesseract core'){status.textContent='正在載入 OCR 引擎…';button.textContent='載入中…';}}});
+  const linesFrom=result=>{const lines=[];for(const block of result?.data?.blocks||[])for(const paragraph of block.paragraphs||[])for(const line of paragraph.lines||[]){const text=String(line.text||'').trim();if(text)lines.push({text,bbox:line.bbox});}return lines.sort((a,b)=>(a.bbox?.y0??0)-(b.bbox?.y0??0));};
+  const ticketLines=lines=>lines.filter(line=>(line.text.match(/\+/g)||[]).length>=3&&line.bbox);
+  const textFromLines=lines=>lines.map(line=>line.text).join('\n');
+  await worker.setParameters({tessedit_char_whitelist:'0123456789+/',preserve_interword_spaces:'1',tessedit_pageseg_mode:'6'});
+  if(status)status.textContent='正在辨識整張票面…';
+  const whole=await worker.recognize(file,{}, {blocks:true});
+  const wholeLines=linesFrom(whole),wholeTicketLines=ticketLines(wholeLines);
+  const wholeText=wholeTicketLines.length?textFromLines(wholeTicketLines):String(whole.data.text||'');
+
+  await worker.setParameters({tessedit_pageseg_mode:'11'});
+  if(status)status.textContent='正在比對票面各行…';
+  const scattered=await worker.recognize(file,{}, {blocks:true});
+  const scatteredLines=linesFrom(scattered),scatteredTicketLines=ticketLines(scatteredLines);
+  const scatteredText=scatteredTicketLines.length?textFromLines(scatteredTicketLines):String(scattered.data.text||'');
+
+  let focusedText='';
+  if(scatteredTicketLines.length>=2&&typeof createImageBitmap==='function'){
+   try{
+    if(status)status.textContent='正在放大號碼區再辨識…';
+    const bitmap=await createImageBitmap(file);
+    try{
+     const boxes=scatteredTicketLines.map(line=>line.bbox).filter(box=>box&&Number.isFinite(box.x0)&&Number.isFinite(box.y0));
+     const minX=Math.min(...boxes.map(box=>box.x0)),maxX=Math.max(...boxes.map(box=>box.x1));
+     const minY=Math.min(...boxes.map(box=>box.y0)),maxY=Math.max(...boxes.map(box=>box.y1));
+     const meanLineHeight=boxes.reduce((sum,box)=>sum+box.y1-box.y0,0)/boxes.length;
+     const padX=Math.max(8,Math.round((maxX-minX)*0.025)),padY=Math.max(5,Math.round(meanLineHeight*0.45));
+     const left=Math.max(0,Math.floor(minX-padX)),top=Math.max(0,Math.floor(minY-padY));
+     const right=Math.min(bitmap.width,Math.ceil(maxX+padX)),bottom=Math.min(bitmap.height,Math.ceil(maxY+padY));
+     const width=right-left,height=bottom-top;
+     if(width>0&&height>0){
+      const scale=Math.min(4,Math.max(1,1800/width)),canvas=document.createElement('canvas');
+      canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round(height*scale));
+      const context=canvas.getContext('2d');
+      if(context){context.fillStyle='#fff';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(bitmap,left,top,width,height,0,0,canvas.width,canvas.height);const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(blob){const focused=await worker.recognize(blob,{}, {blocks:true});focusedText=String(focused.data.text||'');}}
+     }
+    }finally{bitmap.close?.();}
+   }catch{}
+  }
+  const focusedRows=extractTicketRowsFromOcr(focusedText),scatteredRows=extractTicketRowsFromOcr(scatteredText),wholeRows=extractTicketRowsFromOcr(wholeText);
+  let rows;if(scatteredTicketLines.length>=2&&focusedRows.length>=scatteredTicketLines.length)rows=focusedRows;else{rows=mergeTicketRows(focusedRows,scatteredRows);rows=mergeTicketRows(rows,wholeRows);}
+  const raw=$('ocr-raw');
+  if(raw)raw.textContent=[`整張票面（區塊模式）\n${whole.data.text||'（未辨識到文字）'}`,`整張票面（分散模式）\n${scattered.data.text||'（未辨識到文字）'}`,`放大號碼區\n${focusedText||'（未能裁出號碼區）'}`].join('\n\n---\n\n');
+  const rawDetails=$('ocr-details');if(rawDetails)rawDetails.hidden=false;
+  if(rows.length>MAX_REHEARSAL_ENTRIES){if(status)status.textContent='相片辨識超過 100 注，請分批辨識。';return;}
+  setTicketGridRows(rows);
+  const detectedLineCount=Math.max(wholeTicketLines.length,scatteredTicketLines.length);
+  if(status)status.textContent=rows.length?(rows.length<detectedLineCount?`辨識到 ${rows.length} 注，可能有漏讀；請核對或手動補上。`:`相片辨識到 ${rows.length} 注；已填入六格，可逐格核對或修改。`):'未辨識到完整注數；請確保相片正面清晰，或手動輸入。';
+ }catch(error){if(status)status.textContent=error.message||'相片辨識失敗，請改為手動輸入。';}
+ finally{try{if(worker)await worker.terminate();}catch{}button.disabled=false;button.textContent=originalLabel;}
+});
 $('ticket-photo')?.addEventListener('change',()=>{const file=$('ticket-photo').files?.[0],preview=$('ticket-photo-preview'),status=$('meditation-status');if(!file||!preview)return;if(preview.dataset.objectUrl)URL.revokeObjectURL(preview.dataset.objectUrl);const url=URL.createObjectURL(file);preview.dataset.objectUrl=url;preview.src=url;preview.hidden=false;if(status)status.textContent='已選好相片；按「辨識號碼」開始。';});
 $('meditation-clear')?.addEventListener('click',()=>{const status=$('meditation-status'),recognize=$('recognize-ticket-photo');if(recognize?.disabled){if(status)status.textContent='辨識中，完成後可清空注單。';return;}const photo=$('ticket-photo'),preview=$('ticket-photo-preview'),details=$('ocr-details'),raw=$('ocr-raw');setTicketGridRows([]);if(photo)photo.value='';if(preview){if(preview.dataset.objectUrl)URL.revokeObjectURL(preview.dataset.objectUrl);delete preview.dataset.objectUrl;preview.removeAttribute('src');preview.hidden=true;}if(details){details.open=false;details.hidden=true;}if(raw)raw.textContent='';if(status)status.textContent='已清空注單和相片，可重新輸入或選相。'});
 function closeMeditationCelebration(){const dialog=$('meditation-celebration');if(dialog){dialog.hidden=true;dialog.replaceChildren();}}

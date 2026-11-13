@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTicketEntries, parseTicketFields, extractTicketRowsFromOcr, buildRehearsalOrder, MAX_REHEARSAL_ENTRIES } from './ticket-input.js';
+import { parseTicketEntries, parseTicketFields, extractTicketRowsFromOcr, mergeTicketRows, buildRehearsalOrder, MAX_REHEARSAL_ENTRIES } from './ticket-input.js';
 
 test('parses six adjacent two-digit fields and skips untouched rows', () => {
   assert.deepEqual(parseTicketFields([
@@ -52,13 +52,43 @@ test('OCR extraction supports Mark Six plus-separated rows with slash prefixes',
   ]);
 });
 
-test('OCR removes a slash misread as a leading one on later plus-separated rows', () => {
+test('OCR repairs invalid slash artifacts but does not guess over a valid row', () => {
   assert.deepEqual(extractTicketRowsFromOcr('8+13+18+23+31+47\n16+16+22+28+30+36\n11+7+8+23+26+48\n115+17+19+32+40+47'), [
     [8, 13, 18, 23, 31, 47],
     [6, 16, 22, 28, 30, 36],
-    [1, 7, 8, 23, 26, 48],
+    [11, 7, 8, 23, 26, 48],
     [15, 17, 19, 32, 40, 47],
   ]);
+});
+
+test('OCR keeps a valid two-digit first number instead of dropping its leading digit', () => {
+  assert.deepEqual(extractTicketRowsFromOcr('8+13+18+23+31+47\n15+17+19+32+40+47'), [
+    [8, 13, 18, 23, 31, 47],
+    [15, 17, 19, 32, 40, 47],
+  ]);
+});
+
+test('OCR keeps a genuine single-digit first number when the slash is omitted', () => {
+  assert.deepEqual(extractTicketRowsFromOcr('8+13+18+23+31+47\n6+16+22+28+30+36\n1+7+8+23+26+48'), [
+    [8, 13, 18, 23, 31, 47],
+    [6, 16, 22, 28, 30, 36],
+    [1, 7, 8, 23, 26, 48],
+  ]);
+});
+
+test('OCR still fixes later slash artifacts when the first OCR row is malformed', () => {
+  assert.deepEqual(extractTicketRowsFromOcr('8+13+18+23+31447\n16+16+22+28+30+36'), [
+    [6, 16, 22, 28, 30, 36],
+  ]);
+});
+
+test('combines complementary OCR passes in ticket order and keeps repeated tickets', () => {
+  const row1 = [8, 13, 18, 23, 31, 47];
+  const row2 = [6, 16, 22, 28, 30, 36];
+  const row3 = [1, 7, 8, 23, 26, 48];
+  const row4 = [15, 17, 19, 32, 40, 47];
+  assert.deepEqual(mergeTicketRows([row1, row2, row3], [row2, row4]), [row1, row2, row3, row4]);
+  assert.deepEqual(mergeTicketRows([row1, row2, row2, row3], [row1, row2, row3]), [row1, row2, row2, row3]);
 });
 
 test('rehearsal order randomizes the selected ticket and chooses a distinct extra', () => {
