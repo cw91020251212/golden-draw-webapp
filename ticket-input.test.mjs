@@ -8,6 +8,13 @@ test('parse multiple ticket lines and preserve each line', () => {
   ]);
 });
 
+
+test('accepts single- or double-digit numbers, spaces or commas, in any order', () => {
+  assert.deepEqual(parseTicketEntries('8 15,23 31,42 47\n49,34,26,19,11,3'), [
+    [8, 15, 23, 31, 42, 47], [49, 34, 26, 19, 11, 3],
+  ]);
+});
+
 test('rejects missing, duplicate, out-of-range, incomplete, and over-limit tickets', () => {
   for (const value of ['', '1 2 3 4 5', '1 2 3 4 5 5', '1 2 3 4 5 50']) {
     assert.throws(() => parseTicketEntries(value));
