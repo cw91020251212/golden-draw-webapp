@@ -53,9 +53,21 @@ export function parseTicketEntries(text) {
 
 export function extractTicketRowsFromOcr(text) {
   const rows = [];
+  let plusSeparatedRows = 0;
   for (const line of String(text || '').split(/\r?\n/)) {
-    const values = (line.match(/\d{1,2}/g) || []).map(Number);
-    if (isValidEntry(values)) rows.push(values);
+    const plusSeparated = (line.match(/\+/g) || []).length >= 5;
+    const hasSlashPrefix = /^\s*\//.test(line);
+    let normalizedLine = line.trim().replace(/^[\s/]+/, '');
+    let values = (normalizedLine.match(/\d{1,2}/g) || []).map(Number);
+    // HKJC ticket rows after the first start with `/`; OCR can mistake that slash for `1`.
+    if (plusSeparated && plusSeparatedRows > 0 && !hasSlashPrefix && normalizedLine.startsWith('1')) {
+      const withoutSlashArtifact = (normalizedLine.slice(1).match(/\d{1,2}/g) || []).map(Number);
+      if (isValidEntry(withoutSlashArtifact)) values = withoutSlashArtifact;
+    }
+    if (isValidEntry(values)) {
+      rows.push(values);
+      if (plusSeparated) plusSeparatedRows += 1;
+    }
   }
   return rows;
 }

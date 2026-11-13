@@ -43,6 +43,24 @@ test('OCR extraction accepts only complete six-number rows and keeps repeated en
   ]);
 });
 
+test('OCR extraction supports Mark Six plus-separated rows with slash prefixes', () => {
+  assert.deepEqual(extractTicketRowsFromOcr('8+13+18+23+31+47\n/6+16+22+28+30+36\n/1+7+8+23+26+48\n/15+17+19+32+40+47'), [
+    [8, 13, 18, 23, 31, 47],
+    [6, 16, 22, 28, 30, 36],
+    [1, 7, 8, 23, 26, 48],
+    [15, 17, 19, 32, 40, 47],
+  ]);
+});
+
+test('OCR removes a slash misread as a leading one on later plus-separated rows', () => {
+  assert.deepEqual(extractTicketRowsFromOcr('8+13+18+23+31+47\n16+16+22+28+30+36\n11+7+8+23+26+48\n115+17+19+32+40+47'), [
+    [8, 13, 18, 23, 31, 47],
+    [6, 16, 22, 28, 30, 36],
+    [1, 7, 8, 23, 26, 48],
+    [15, 17, 19, 32, 40, 47],
+  ]);
+});
+
 test('rehearsal order randomizes the selected ticket and chooses a distinct extra', () => {
   const chosen = [8, 15, 23, 31, 42, 47];
   const firstOrder = buildRehearsalOrder(chosen, () => 0);
