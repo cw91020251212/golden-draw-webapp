@@ -11,7 +11,7 @@ import {CompatibleRenderer} from './compat.js?v=ref-shot-27';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
 import {MAX_REHEARSAL_ENTRIES,parseTicketFields,extractTicketRowsFromOcr,mergeTicketRows,buildRehearsalDraw}from './ticket-input.js?v=ticket-grid-5';
 import {MUSIC_STORAGE_KEY,DEFAULT_TRACK_URL,DEFAULT_TRACK_NAME,MUSIC_LOOPS,clampVolume,readMusicPrefs,writeMusicPrefs,musicControlState} from './music-panel.js?v=music-panel-1';
-import { openCelebration } from './celebration.js?v=celebration-4';
+import { openCelebration } from './celebration.js?v=celebration-5';
 const $=id=>document.getElementById(id);
 const reds=new Set([1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46]);
 const blues=new Set([3,4,9,10,14,15,20,25,26,31,36,37,41,42,47,48]);
