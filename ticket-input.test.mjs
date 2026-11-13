@@ -1,26 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTicketEntries, extractTicketRowsFromOcr, buildRehearsalOrder, MAX_REHEARSAL_ENTRIES } from './ticket-input.js';
+import { parseTicketEntries, parseTicketFields, extractTicketRowsFromOcr, buildRehearsalOrder, MAX_REHEARSAL_ENTRIES } from './ticket-input.js';
 
-test('parse multiple ticket lines and preserve each line', () => {
+test('parses six adjacent two-digit fields and skips untouched rows', () => {
+  assert.deepEqual(parseTicketFields([
+    ['08', '15', '23', '31', '42', '47'],
+    ['', '', '', '', '', ''],
+    ['03', '11', '19', '26', '34', '49'],
+  ]), [
+    [8, 15, 23, 31, 42, 47],
+    [3, 11, 19, 26, 34, 49],
+  ]);
+});
+
+test('requires all six two-digit positions and rejects invalid or repeated numbers', () => {
+  for (const fields of [
+    [['08', '15', '23', '', '42', '47']],
+    [['8', '15', '23', '31', '42', '47']],
+    [['00', '15', '23', '31', '42', '47']],
+    [['08', '15', '23', '31', '42', '50']],
+    [['08', '15', '23', '31', '42', '42']],
+  ]) assert.throws(() => parseTicketFields(fields));
+});
+
+test('requires at least one completed ticket and caps the grid at 100 rows', () => {
+  assert.throws(() => parseTicketFields([['', '', '', '', '', '']]), /至少一注/);
+  assert.equal(MAX_REHEARSAL_ENTRIES, 100);
+  const row = ['01', '02', '03', '04', '05', '06'];
+  assert.equal(parseTicketFields(Array.from({ length: 100 }, () => row)).length, 100);
+  assert.throws(() => parseTicketFields(Array.from({ length: 101 }, () => row)), /100/);
+});
+
+test('legacy text parser still supports OCR line extraction and common delimiters', () => {
   assert.deepEqual(parseTicketEntries('08 15 23 31 42 47\n03, 11, 19, 26, 34, 49'), [
     [8, 15, 23, 31, 42, 47], [3, 11, 19, 26, 34, 49],
   ]);
-});
-
-
-test('accepts single- or double-digit numbers, spaces or commas, in any order', () => {
-  assert.deepEqual(parseTicketEntries('8 15,23 31,42 47\n49,34,26,19,11,3'), [
-    [8, 15, 23, 31, 42, 47], [49, 34, 26, 19, 11, 3],
-  ]);
-});
-
-test('rejects missing, duplicate, out-of-range, incomplete, and over-limit tickets', () => {
-  for (const value of ['', '1 2 3 4 5', '1 2 3 4 5 5', '1 2 3 4 5 50']) {
-    assert.throws(() => parseTicketEntries(value));
-  }
-  assert.equal(MAX_REHEARSAL_ENTRIES, 100);
-  assert.throws(() => parseTicketEntries(Array.from({ length: 101 }, () => '1 2 3 4 5 6').join('\n')), /100/);
 });
 
 test('OCR extraction accepts only complete six-number rows and keeps repeated entries', () => {
@@ -29,12 +43,10 @@ test('OCR extraction accepts only complete six-number rows and keeps repeated en
   ]);
 });
 
-test('rehearsal order randomizes the selected ticket, keeps its six numbers, and chooses a distinct extra', () => {
+test('rehearsal order randomizes the selected ticket and chooses a distinct extra', () => {
   const chosen = [8, 15, 23, 31, 42, 47];
-  const alwaysFirst = n => 0;
-  const alwaysLast = n => n - 1;
-  const firstOrder = buildRehearsalOrder(chosen, alwaysFirst);
-  const secondOrder = buildRehearsalOrder(chosen, alwaysLast);
+  const firstOrder = buildRehearsalOrder(chosen, () => 0);
+  const secondOrder = buildRehearsalOrder(chosen, n => n - 1);
   for (const order of [firstOrder, secondOrder]) {
     assert.equal(order.length, 7);
     assert.equal(new Set(order).size, 7);

@@ -6,6 +6,40 @@ function isValidEntry(numbers) {
     new Set(numbers).size === 6;
 }
 
+export function parseTicketFields(rows) {
+  if (!Array.isArray(rows)) throw new TypeError('注單欄位格式錯誤。');
+  if (rows.length > MAX_REHEARSAL_ENTRIES) {
+    throw new Error(`每次彩排最多 ${MAX_REHEARSAL_ENTRIES} 注，請分批輸入。`);
+  }
+
+  const entries = [];
+  rows.forEach((row, index) => {
+    if (!Array.isArray(row) || row.length !== 6) {
+      throw new Error(`第 ${index + 1} 注需要六個號碼位置。`);
+    }
+    const cells = row.map(value => String(value ?? '').trim());
+    if (cells.every(value => value === '')) return;
+    if (cells.some(value => value === '')) {
+      throw new Error(`第 ${index + 1} 注未填滿六個位置。`);
+    }
+    if (cells.some(value => !/^\d{2}$/.test(value))) {
+      throw new Error(`第 ${index + 1} 注每格請輸入兩位數，例如 08。`);
+    }
+
+    const numbers = cells.map(Number);
+    if (numbers.some(number => number < 1 || number > 49)) {
+      throw new Error(`第 ${index + 1} 注號碼須為 01–49。`);
+    }
+    if (!isValidEntry(numbers)) {
+      throw new Error(`第 ${index + 1} 注不可有重複號碼。`);
+    }
+    entries.push(numbers);
+  });
+
+  if (!entries.length) throw new Error('請先輸入至少一注號碼。');
+  return entries;
+}
+
 export function parseTicketEntries(text) {
   const lines = String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   if (!lines.length) throw new Error('請先輸入或辨識至少一注號碼。');
