@@ -21,9 +21,10 @@ export function resetTickets(expectedTotal) {
   getNodes(); total = Math.max(0, Math.floor(Number(expectedTotal) || 0)); count = 0;
   ticketRecords = []; ticketsNode.replaceChildren(); updateProgress();
 }
-export function addTicket({ main, extra, index, order = [] }) {
+export function addTicket({ main, extra, index, order = [], speed = 1 }) {
   if (!ticketsNode) getNodes();
   if (!Array.isArray(main) || main.length !== 6 || main.some(n => !Number.isInteger(n) || n < 1 || n > 49) || !Number.isInteger(extra) || extra < 1 || extra > 49) throw new TypeError('號碼需為六個 1–49 正選號及一個 1–49 特別號');
+  if (!Array.isArray(order) || order.length !== 7 || order.some(n => !Number.isInteger(n) || n < 1 || n > 49) || new Set(order).size !== 7) throw new TypeError('流程需包含七個不重複的 1–49 號碼');
   const ticketIndex = Number.isInteger(index) && index > 0 ? index : ticketsNode.children.length + 1;
   ticketRecords.push({ index: ticketIndex, main: [...main], extra, order: [...order] });
   const card = document.createElement('article'); card.className = 'ticket-card'; card.dataset.revealed = 'false';
@@ -32,18 +33,24 @@ export function addTicket({ main, extra, index, order = [] }) {
   const mainLine = document.createElement('div'); mainLine.className = 'ticket-number-line';
   const extraLine = document.createElement('div'); extraLine.className = 'ticket-extra-line';
   const label = document.createElement('span'); label.className = 'ticket-extra-label'; label.textContent = '特別號（模擬附加，非單式填寫號碼）';
-  const button = document.createElement('button'); button.type = 'button'; button.className = 'ticket-reveal-button'; button.textContent = `揭曉第 ${ticketIndex} 注`;
+  const revealButton = document.createElement('button'); revealButton.type = 'button'; revealButton.className = 'ticket-reveal-button'; revealButton.textContent = `揭曉第 ${ticketIndex} 注`;
   const balls = main.map(n => createBall(n, false));
   const special = createBall(extra, true);
   balls.forEach(b => mainLine.append(b.wrap)); extraLine.append(label, special.wrap); result.append(mainLine, extraLine);
-  const note = document.createElement('p'); note.className = 'ticket-reveal-note'; note.textContent = '按下方「揭曉」，即可查看這一注全部號碼。';
-  button.addEventListener('click', () => {
+  const note = document.createElement('p'); note.className = 'ticket-reveal-note'; note.textContent = '按「揭曉」查看號碼；保存流程會記錄出珠次序及動畫速度。';
+  revealButton.addEventListener('click', () => {
     if (card.dataset.revealed === 'true') return;
     [...balls, special].forEach(b => b.show());
-    card.dataset.revealed = 'true'; button.disabled = true; button.textContent = `第 ${ticketIndex} 注已揭曉`;
+    card.dataset.revealed = 'true'; revealButton.disabled = true; revealButton.textContent = `第 ${ticketIndex} 注已揭曉`;
     count++; updateProgress(); document.dispatchEvent(new CustomEvent('ticket:revealed', { detail: { index: ticketIndex, main: [...main], extra, order: [...order] } }));
   });
-  card.append(heading, result, note, button); ticketsNode.append(card); updateProgress(); return card;
+  const actions = document.createElement('div'); actions.className = 'ticket-flow-actions';
+  const saveButton = document.createElement('button'); saveButton.type = 'button'; saveButton.className = 'ticket-flow-button'; saveButton.textContent = '保存本注流程'; saveButton.setAttribute('aria-label', `保存第 ${ticketIndex} 注完整攪珠流程`);
+  saveButton.addEventListener('click', () => document.dispatchEvent(new CustomEvent('ticket:save-flow', { detail: { index: ticketIndex, order: [...order], speed, button: saveButton } })));
+  const replayButton = document.createElement('button'); replayButton.type = 'button'; replayButton.className = 'ticket-flow-button'; replayButton.textContent = '重播完整動畫'; replayButton.setAttribute('aria-label', `重播第 ${ticketIndex} 注完整攪珠動畫`);
+  replayButton.addEventListener('click', () => document.dispatchEvent(new CustomEvent('ticket:replay-flow', { detail: { index: ticketIndex, order: [...order], speed } })));
+  actions.append(saveButton, replayButton);
+  card.append(heading, result, note, revealButton, actions); ticketsNode.append(card); updateProgress(); return card;
 }
 export function finishTickets() {}
 export function getTicketsCopyText() {

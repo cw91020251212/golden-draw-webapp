@@ -50,3 +50,43 @@
 .ticket-reveal-button:focus-visible{outline:3px solid #d4a342;outline-offset:3px}
 .ticket-reveal-button:disabled{filter:saturate(.55);box-shadow:0 2px 0 #a8afa4!important}
 @media(prefers-reduced-motion:reduce){.ticket-reveal-button{transition:none}}
+
+.ticket-flow-actions,.saved-flow-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.ticket-flow-button,.saved-flow-remove{min-height:44px;padding:9px 14px;border:1px solid #b8c2b4;border-radius:12px;background:#f4f4eb;color:#30483a;font:inherit;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 2px 0 #a7b0a3}
+.ticket-flow-button:hover:not(:disabled),.saved-flow-remove:hover{background:#e8eee4}
+.ticket-flow-button:focus-visible,.saved-flow-remove:focus-visible,.celebration-card button:focus-visible{outline:3px solid #d4a342;outline-offset:3px}
+.ticket-flow-button:disabled{opacity:.75;cursor:default}
+.saved-flow-remove{background:#fffaf0;color:#65532b}
+.saved-flows{padding:22px 0 28px;border-bottom:1px solid #deded2}
+.saved-flows h2{font-family:Georgia,'Songti TC',serif;font-size:25px;font-weight:500;margin:0 0 8px;color:#315c3f}
+.saved-flows>p{font-size:16px;line-height:1.6;color:#526154}
+#saved-flows-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:16px}
+.saved-flow-card{min-width:0;padding:15px;border:1px solid #d8c995;border-radius:13px;background:#fffdf5;color:#30483a}
+.saved-flow-card h3{margin:0 0 7px;font-size:17px;line-height:1.4}
+.saved-flow-card p{margin:0;color:#526154;line-height:1.6;overflow-wrap:anywhere}
+.meditation-panel{margin-top:20px;padding:18px;border:1px solid #d7c98e;border-radius:14px;background:#fffdf5;color:#30483a}
+.meditation-panel h3{margin:0 0 10px;font-family:Georgia,'Songti TC',serif;font-size:21px;font-weight:600}
+.meditation-toggle{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;cursor:pointer}
+.meditation-toggle input{width:20px;height:20px;accent-color:#315c3f}
+#meditation-status{margin:10px 0;color:#526154;line-height:1.6}
+#meditation-fields fieldset{margin:0;padding:12px;border:1px solid #d8d0b9;border-radius:10px}
+#meditation-fields legend{padding:0 5px;color:#315c3f;font-weight:700}
+.meditation-number-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px}
+.meditation-number-grid label{display:grid;gap:5px;color:#526154;font-size:14px}
+.meditation-number-grid input{width:100%;min-width:0;min-height:42px;padding:6px;border:1px solid #b8c2b4;border-radius:8px;background:#fff;color:#243c2d;font:inherit;font-variant-numeric:tabular-nums}
+.meditation-number-grid input:focus-visible{outline:3px solid #d4a342;outline-offset:2px}
+.meditation-celebration[hidden]{display:none!important}
+.meditation-celebration{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;overflow:hidden;padding:24px;background:rgba(20,36,27,.82);backdrop-filter:blur(4px)}
+.celebration-card{position:relative;z-index:2;width:min(560px,100%);padding:30px 24px;border:2px solid #e6c566;border-radius:20px;background:#fff9e8;color:#244c37;text-align:center;box-shadow:0 18px 60px #0005}
+.celebration-card h2{margin:0 0 12px;color:#8a5814;font-family:Georgia,'Songti TC',serif;font-size:clamp(26px,6vw,38px);line-height:1.25}
+.celebration-card p{font-size:18px;line-height:1.7}
+.celebration-card button{min-height:48px;padding:10px 22px;border:0;border-radius:12px;background:#315c3f;color:#fffdf5;font:inherit;font-weight:700;cursor:pointer}
+.fireworks{position:absolute;inset:0;pointer-events:none}
+.firework-burst{position:absolute;left:var(--burst-x);top:var(--burst-y);width:0;height:0;color:#f5d46b;animation:firework-pop 1.5s ease-out var(--delay) both}
+.firework-burst:nth-child(2n){color:#ff9b62}
+.firework-burst:nth-child(3n){color:#9fdaa2}
+.firework-burst i{position:absolute;left:0;top:0;width:3px;height:28px;border-radius:3px;background:linear-gradient(to top,transparent,currentColor);transform:rotate(var(--angle)) translateY(-10px);transform-origin:50% 100%;opacity:0;animation:firework-ray 1.45s ease-out var(--delay) both}
+@keyframes firework-pop{0%{opacity:0;transform:scale(.1)}15%{opacity:1}100%{opacity:0;transform:scale(1.1)}}
+@keyframes firework-ray{0%{opacity:0;transform:rotate(var(--angle)) translateY(-12px) scaleY(.15)}18%{opacity:1}100%{opacity:0;transform:rotate(var(--angle)) translateY(-100px) scaleY(1)}}
+@media(max-width:760px){#saved-flows-list{grid-template-columns:1fr}.meditation-number-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.ticket-flow-actions>*{flex:1 1 100%}}
+@media(prefers-reduced-motion:reduce){.firework-burst,.firework-burst i{animation:none;opacity:.35}.firework-burst i{transform:rotate(var(--angle)) translateY(-45px)}}
