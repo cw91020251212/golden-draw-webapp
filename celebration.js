@@ -1,5 +1,7 @@
 // End-of-rehearsal celebration: canvas fireworks, balloons and confetti in the
-// house gold palette, plus applause synthesized in the page's AudioContext.
+// house gold palette. Audio is synthesized in the page's AudioContext and mixed
+// on top of the existing soundtrack: aerial fireworks (boom and crackle only)
+// plus a long applause-and-cheers bed. No whistles, glides, or beeps.
 export const CELEBRATION_HEADING = '恭喜你中頭獎';
 
 const GOLD = ['#fff6d4', '#ffe7a4', '#f8dc8a', '#e8c36a', '#d7a441', '#c4a15a', '#a98442', '#8a6424', '#f4f1e9'];
@@ -15,8 +17,15 @@ export function celebrationPlan(reduced) {
   if (reduced) {
     return {
       heading: CELEBRATION_HEADING,
-      applauseSeconds: 3.4,
-      bursts: [{ t: 0.08, x: 0.5, y: 0.3, power: 1, kind: 'still' }],
+      reduced: true,
+      applauseSeconds: 5.4,
+      fadeSeconds: 1.35,
+      launchLead: 0,
+      bursts: [
+        { t: 0.08, x: 0.34, y: 0.28, power: 0.85, kind: 'still' },
+        { t: 0.85, x: 0.66, y: 0.26, power: 0.75, kind: 'still' },
+        { t: 1.55, x: 0.5, y: 0.24, power: 0.9, kind: 'still' }
+      ],
       balloonCount: 5,
       confettiPerSecond: 10,
       confettiFor: 2.2,
@@ -25,119 +34,323 @@ export function celebrationPlan(reduced) {
   }
   return {
     heading: CELEBRATION_HEADING,
-    applauseSeconds: 7.8,
+    reduced: false,
+    applauseSeconds: 12.6,
+    fadeSeconds: 2.5,
+    launchLead: 0.48,
     bursts: [
-      { t: 0.15, x: 0.22, y: 0.24, power: 0.95, kind: 'peony' },
-      { t: 0.55, x: 0.78, y: 0.2, power: 0.9, kind: 'peony' },
-      { t: 1.2, x: 0.5, y: 0.16, power: 1.2, kind: 'crown' },
-      { t: 2.05, x: 0.32, y: 0.3, power: 0.85, kind: 'willow' },
-      { t: 2.7, x: 0.7, y: 0.26, power: 1, kind: 'peony' },
-      { t: 3.55, x: 0.16, y: 0.22, power: 0.8, kind: 'peony' },
-      { t: 4.35, x: 0.84, y: 0.28, power: 0.95, kind: 'willow' },
-      { t: 5.15, x: 0.48, y: 0.18, power: 1.25, kind: 'crown' },
-      { t: 6.2, x: 0.36, y: 0.24, power: 0.75, kind: 'peony' },
-      { t: 7.15, x: 0.64, y: 0.2, power: 0.9, kind: 'crown' }
+      { t: 0.12, x: 0.22, y: 0.24, power: 0.95, kind: 'peony' },
+      { t: 0.62, x: 0.78, y: 0.2, power: 0.9, kind: 'peony' },
+      { t: 1.25, x: 0.5, y: 0.16, power: 1.15, kind: 'crown' },
+      { t: 2.15, x: 0.3, y: 0.3, power: 0.85, kind: 'willow' },
+      { t: 2.85, x: 0.72, y: 0.26, power: 1, kind: 'peony' },
+      { t: 3.6, x: 0.16, y: 0.22, power: 0.8, kind: 'peony' },
+      { t: 4.45, x: 0.84, y: 0.28, power: 0.95, kind: 'willow' },
+      { t: 5.25, x: 0.48, y: 0.18, power: 1.2, kind: 'crown' },
+      { t: 6.15, x: 0.28, y: 0.27, power: 0.85, kind: 'peony' },
+      { t: 7.05, x: 0.7, y: 0.22, power: 1, kind: 'crown' },
+      { t: 8.05, x: 0.38, y: 0.24, power: 0.9, kind: 'peony' },
+      { t: 8.95, x: 0.62, y: 0.2, power: 0.95, kind: 'willow' },
+      { t: 9.9, x: 0.5, y: 0.16, power: 1.15, kind: 'crown' },
+      { t: 10.85, x: 0.24, y: 0.26, power: 0.8, kind: 'peony' }
     ],
     balloonCount: 8,
     confettiPerSecond: 22,
-    confettiFor: 8.5,
-    encoreUntil: 9.5
+    confettiFor: 12.2,
+    encoreUntil: 13
   };
 }
 
-function fadeInOut(u) {
-  if (u <= 0 || u >= 1) return 0;
-  if (u < 0.12) return u / 0.12;
-  if (u > 0.78) return (1 - u) / 0.22;
-  return 1;
+const SHELL = {
+  peony: { tail: 1.05, crackle: 160, spread: 1.45, boom: 1 },
+  willow: { tail: 1.55, crackle: 120, spread: 0.8, boom: 0.9 },
+  crown: { tail: 1.15, crackle: 220, spread: 1.4, boom: 1.08 },
+  still: { tail: 0.8, crackle: 90, spread: 1.2, boom: 0.8 }
+};
+
+function addSample(left, right, index, sample, pan) {
+  if (index < 0 || index >= left.length || !Number.isFinite(sample)) return;
+  const angle = Math.min(1, Math.max(0, pan)) * Math.PI / 2;
+  left[index] += sample * Math.cos(angle);
+  right[index] += sample * Math.sin(angle);
 }
 
-// Many short filtered-noise claps, panned across a stereo field. Not a recording.
-export function synthesizeApplause(sampleRate, seconds, random = Math.random) {
-  const total = Math.max(1, Math.floor(sampleRate * seconds));
-  const left = new Float32Array(total);
-  const right = new Float32Array(total);
-  const claps = Math.max(8, Math.floor(seconds * 26));
-  for (let c = 0; c < claps; c++) {
-    const place = (c + random()) / claps;
-    const env = fadeInOut(place);
-    if (env <= 0) continue;
-    const start = Math.min(total - 2, Math.floor(place * total));
-    const dur = Math.floor(sampleRate * (0.018 + random() * 0.045));
-    const amp = (0.22 + random() * 0.78) * (0.55 + env * 0.45);
-    const pan = random();
-    let noise = 0;
-    for (let i = 0; i < dur; i++) {
-      const idx = start + i;
-      if (idx >= total) break;
-      const decay = Math.pow(1 - i / dur, 1.85);
-      noise = noise * 0.42 + (random() * 2 - 1) * 0.58;
-      const sample = noise * decay * amp;
-      left[idx] += sample * (1 - pan);
-      right[idx] += sample * pan;
-    }
+function fadeEdges(left, right, sampleRate, fadeInSeconds, fadeOutSeconds) {
+  const inn = Math.min(left.length, Math.floor(sampleRate * fadeInSeconds));
+  for (let i = 0; i < inn; i++) {
+    const g = inn <= 1 ? 1 : i / inn;
+    left[i] *= g;
+    right[i] *= g;
   }
-  let bed = 0;
-  for (let i = 0; i < total; i++) {
-    const swell = fadeInOut(i / total);
-    bed = bed * 0.965 + (random() * 2 - 1) * 0.035;
-    const murmur = bed * swell * 0.28;
-    left[i] += murmur;
-    right[i] += murmur * 0.92;
+  const out = Math.min(left.length, Math.floor(sampleRate * fadeOutSeconds));
+  const start = left.length - out;
+  for (let i = 0; i < out; i++) {
+    const u = out <= 1 ? 1 : i / (out - 1);
+    const g = Math.pow(1 - u, 1.35);
+    left[start + i] *= g;
+    right[start + i] *= g;
   }
+}
+
+function softenAndNormalize(left, right, target) {
   let peak = 0;
-  for (let i = 0; i < total; i++) peak = Math.max(peak, Math.abs(left[i]), Math.abs(right[i]));
-  const gain = peak > 0 ? 0.86 / peak : 1;
-  for (let i = 0; i < total; i++) {
+  for (let i = 0; i < left.length; i++) {
+    left[i] = Math.tanh(left[i]);
+    right[i] = Math.tanh(right[i]);
+    peak = Math.max(peak, Math.abs(left[i]), Math.abs(right[i]));
+  }
+  const gain = peak > 0.0001 ? target / peak : 1;
+  for (let i = 0; i < left.length; i++) {
     left[i] *= gain;
     right[i] *= gain;
   }
-  return { left, right, peak: peak * gain };
+  return peak * gain;
 }
 
-function playApplause(audioContext, seconds, reduced) {
-  if (!audioContext || typeof audioContext.createBuffer !== 'function') return { stop() {}, started: false, reason: 'unavailable' };
-  const { left, right } = synthesizeApplause(audioContext.sampleRate, seconds);
-  const buffer = audioContext.createBuffer(2, left.length, audioContext.sampleRate);
-  buffer.copyToChannel(left, 0);
-  buffer.copyToChannel(right, 1);
+function bandpass(freq, q, sampleRate) {
+  const w0 = 2 * Math.PI * freq / sampleRate;
+  const alpha = Math.sin(w0) / (2 * q);
+  const a0 = 1 + alpha;
+  return {
+    b0: alpha / a0,
+    b1: 0,
+    b2: -alpha / a0,
+    a1: (-2 * Math.cos(w0)) / a0,
+    a2: (1 - alpha) / a0,
+    x1: 0, x2: 0, y1: 0, y2: 0,
+    process(x) {
+      const y = this.b0 * x + this.b1 * this.x1 + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2;
+      this.x2 = this.x1;
+      this.x1 = x;
+      this.y2 = this.y1;
+      this.y1 = y;
+      return y;
+    }
+  };
+}
+
+// Aerial shell made only of noise: a low rumble, a short bright report, then
+// crackle. No oscillators, so there is no whistle, falling tone, or beep.
+function writeBoom(left, right, sampleRate, startSec, power, pan, random, shell) {
+  const tail = shell.tail;
+  const n = Math.floor(sampleRate * tail);
+  const start = Math.floor(startSec * sampleRate);
+  let rumble = 0;
+  let body = 0;
+  let hp = 0;
+  let prev = 0;
+  const weight = 0.9 * power * shell.boom;
+  const hpA = Math.exp(-2 * Math.PI * 30 / sampleRate);
+  const rumbleA = 1 - Math.exp(-2 * Math.PI * 110 / sampleRate);
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate;
+    const cutoff = 90 + 1800 * Math.exp(-t / 0.045);
+    const bodyA = 1 - Math.exp(-2 * Math.PI * Math.min(cutoff, sampleRate * 0.45) / sampleRate);
+    const white = random() * 2 - 1;
+    hp = hpA * (hp + white - prev);
+    prev = white;
+    rumble += rumbleA * (hp - rumble);
+    body += bodyA * (hp - body);
+    const thud = rumble * Math.exp(-t / 0.2) * 1.35;
+    const report = body * Math.exp(-t / 0.07) * 0.55;
+    const crack = t < 0.035 ? (white - body) * Math.exp(-t / 0.01) * 0.16 : 0;
+    addSample(left, right, start + i, (thud + report + crack) * weight, pan);
+  }
+  const sparks = Math.max(12, Math.round(shell.crackle * power));
+  for (let s = 0; s < sparks; s++) {
+    const u = Math.pow(random(), shell.spread);
+    const loud = random() < 0.22;
+    const mid = loud || random() < 0.4;
+    const t0 = 0.05 + u * Math.max(0.08, tail - 0.1);
+    const dur = mid ? 0.009 + random() * 0.014 : 0.0014 + random() * 0.0032;
+    const amp = (loud ? 0.85 + random() * 0.7 : 0.1 + random() * 0.32) * Math.exp(-u * 0.95) * power * (mid ? 0.9 : 0.62);
+    const grains = Math.max(2, Math.floor(sampleRate * dur));
+    const i0 = start + Math.floor(t0 * sampleRate);
+    const cutoff = mid ? 1300 + random() * 1900 : 4200 + random() * 1800;
+    const a = 1 - Math.exp(-2 * Math.PI * Math.min(cutoff, sampleRate * 0.45) / sampleRate);
+    let state = 0;
+    const sparkPan = pan + (random() - 0.5) * 0.42;
+    for (let k = 0; k < grains; k++) {
+      const env = Math.sin(Math.PI * (k + 0.5) / grains);
+      const white = random() * 2 - 1;
+      state += a * (white - state);
+      const bright = mid ? state : white - state;
+      addSample(left, right, i0 + k, bright * env * amp, sparkPan);
+    }
+  }
+}
+
+export function fireworkCues(plan) {
+  const lead = plan.launchLead || 0;
+  const calm = !!plan.reduced;
+  const cues = [];
+  for (const burst of plan.bursts) {
+    const shell = SHELL[burst.kind] || SHELL.peony;
+    const scale = calm ? 0.62 : 1;
+    cues.push({
+      t: burst.t + lead,
+      type: 'boom',
+      pan: burst.x,
+      power: burst.power,
+      tail: shell.tail * (calm ? 0.8 : 1),
+      crackle: Math.round(shell.crackle * scale),
+      spread: shell.spread,
+      boom: shell.boom,
+      crown: burst.kind === 'crown' && !calm
+    });
+  }
+  const withCrown = [];
+  for (const cue of cues) {
+    withCrown.push(cue);
+    if (cue.type === 'boom' && cue.crown) {
+      withCrown.push({
+        ...cue,
+        t: cue.t + 0.18,
+        power: cue.power * 0.58,
+        tail: cue.tail * 0.62,
+        crackle: Math.round(cue.crackle * 0.5),
+        crown: false
+      });
+    }
+  }
+  return withCrown;
+}
+
+export function synthesizeFireworkLayer(sampleRate, seconds, cues, random = Math.random) {
+  const total = Math.max(1, Math.floor(sampleRate * seconds));
+  const left = new Float32Array(total);
+  const right = new Float32Array(total);
+  for (const cue of cues) writeBoom(left, right, sampleRate, cue.t, cue.power, cue.pan, random, cue);
+  fadeEdges(left, right, sampleRate, 0.012, 0.4);
+  const peak = softenAndNormalize(left, right, 0.9);
+  return { left, right, peak };
+}
+
+// A cheer is a swell of colored noise, like a group shouting, with no pitch.
+const CHEER_BANDS = [
+  [420, 980],
+  [520, 1400],
+  [360, 860]
+];
+
+function writeCheer(left, right, sampleRate, startSec, random) {
+  const bands = CHEER_BANDS[Math.floor(random() * CHEER_BANDS.length)];
+  const dur = 0.55 + random() * 0.5;
+  const n = Math.floor(sampleRate * dur);
+  const start = Math.floor(startSec * sampleRate);
+  const low = bandpass(bands[0], 1.4, sampleRate);
+  const high = bandpass(bands[1], 1.15, sampleRate);
+  const pan = 0.22 + random() * 0.56;
+  const amp = 0.42 + random() * 0.2;
+  for (let i = 0; i < n; i++) {
+    const u = i / n;
+    const env = Math.sin(Math.min(1, u / 0.22) * Math.PI * 0.5) * Math.pow(1 - u, 0.7);
+    const white = random() * 2 - 1;
+    const shout = low.process(white) * 0.85 + high.process(white) * 0.45;
+    addSample(left, right, start + i, shout * env * amp, pan);
+  }
+}
+
+// Dense overlapping claps plus unpitched cheer swells. The bed stays continuous
+// so it reads as a crowd, not as separate pops or beeps.
+export function synthesizeCrowd(sampleRate, seconds, fadeSeconds, random = Math.random) {
+  const total = Math.max(1, Math.floor(sampleRate * seconds));
+  const left = new Float32Array(total);
+  const right = new Float32Array(total);
+  const claps = Math.max(24, Math.floor(seconds * 92));
+  for (let c = 0; c < claps; c++) {
+    const place = (c + random() * 0.9) / claps;
+    const start = Math.min(total - 2, Math.floor(place * total));
+    const dur = Math.max(2, Math.floor(sampleRate * (0.011 + random() * 0.026)));
+    const amp = 0.28 + random() * 0.72;
+    const pan = random();
+    const cut = 850 + random() * 2400;
+    const a = 1 - Math.exp(-2 * Math.PI * Math.min(cut, sampleRate * 0.45) / sampleRate);
+    let lp = 0;
+    for (let i = 0; i < dur; i++) {
+      const u = i / dur;
+      const env = Math.sin(Math.min(1, u / 0.14) * Math.PI * 0.5) * Math.exp(-u * 3.1);
+      const white = random() * 2 - 1;
+      lp += a * (white - lp);
+      addSample(left, right, start + i, (lp * 0.82 + (white - lp) * 0.38) * env * amp, pan);
+    }
+  }
+  let murmurL = 0;
+  let murmurR = 0;
+  let walk = 0.55;
+  for (let i = 0; i < total; i++) {
+    walk = Math.min(0.95, Math.max(0.28, walk + (random() - 0.5) * 0.0016));
+    const whiteL = random() * 2 - 1;
+    const whiteR = random() * 2 - 1;
+    murmurL = murmurL * 0.93 + whiteL * 0.07;
+    murmurR = murmurR * 0.93 + whiteR * 0.07;
+    const wobble = 0.9 + 0.1 * Math.sin((i / sampleRate) * 2 * Math.PI * 0.27);
+    left[i] += murmurL * walk * 0.2 * wobble;
+    right[i] += murmurR * (1.05 - walk) * 0.2 * wobble;
+  }
+  const cheerTimes = [];
+  const slots = Math.max(3, Math.round(seconds * 0.85));
+  const span = Math.max(0.4, seconds - Math.min(fadeSeconds, seconds * 0.45) - 0.45);
+  for (let c = 0; c < slots; c++) {
+    const start = 0.32 + ((c + random() * 0.55) / slots) * span;
+    cheerTimes.push(start);
+    writeCheer(left, right, sampleRate, start, random);
+  }
+  fadeEdges(left, right, sampleRate, 0.18, fadeSeconds);
+  const peak = softenAndNormalize(left, right, 0.88);
+  return { left, right, peak, cheerTimes };
+}
+
+function playBuffer(audioContext, rendered, destination, when) {
+  const buffer = audioContext.createBuffer(2, rendered.left.length, audioContext.sampleRate);
+  buffer.copyToChannel(rendered.left, 0);
+  buffer.copyToChannel(rendered.right, 1);
   const source = audioContext.createBufferSource();
   source.buffer = buffer;
-  const highpass = audioContext.createBiquadFilter();
-  highpass.type = 'highpass';
-  highpass.frequency.value = 520;
-  const lowpass = audioContext.createBiquadFilter();
-  lowpass.type = 'lowpass';
-  lowpass.frequency.value = 5200;
-  const gain = audioContext.createGain();
-  const level = reduced ? 0.16 : 0.3;
+  source.connect(destination);
+  source.start(when);
+  source.onended = () => { try { source.disconnect(); } catch { /* already torn down */ } };
+  return source;
+}
+
+// Sits on audioContext.destination. Does not pause, duck, or replace the
+// HTML soundtrack (Gilded Winter Gala plays on its own element).
+export function playCelebrationAudio(audioContext, plan, random = Math.random) {
+  if (!audioContext || typeof audioContext.createBuffer !== 'function') return { stop() {}, started: false, reason: 'unavailable', cues: [] };
+  const seconds = plan.applauseSeconds;
+  const cues = fireworkCues(plan);
+  const calm = !!plan.reduced;
+  const crowd = synthesizeCrowd(audioContext.sampleRate, seconds, plan.fadeSeconds, random);
+  const fireworks = synthesizeFireworkLayer(audioContext.sampleRate, seconds, cues, random);
   const now = audioContext.currentTime;
-  gain.gain.setValueAtTime(0.001, now);
-  gain.gain.exponentialRampToValueAtTime(level, now + 0.18);
-  gain.gain.setValueAtTime(level, now + Math.max(0.2, seconds - 1.15));
-  gain.gain.exponentialRampToValueAtTime(0.001, now + seconds);
-  source.connect(highpass);
-  highpass.connect(lowpass);
-  lowpass.connect(gain);
-  gain.connect(audioContext.destination);
-  source.start(now);
-  source.stop(now + seconds + 0.05);
+  const master = audioContext.createGain();
+  master.gain.setValueAtTime(calm ? 0.72 : 1, now);
+  master.connect(audioContext.destination);
+  const crowdGain = audioContext.createGain();
+  crowdGain.gain.setValueAtTime(calm ? 0.2 : 0.36, now);
+  crowdGain.connect(master);
+  const fireGain = audioContext.createGain();
+  fireGain.gain.setValueAtTime(calm ? 0.24 : 0.48, now);
+  fireGain.connect(master);
+  const sources = [
+    playBuffer(audioContext, crowd, crowdGain, now),
+    playBuffer(audioContext, fireworks, fireGain, now)
+  ];
   let stopped = false;
   const stop = () => {
     if (stopped) return;
     stopped = true;
     const t = audioContext.currentTime;
     try {
-      gain.gain.cancelScheduledValues(t);
-      gain.gain.setValueAtTime(Math.max(0.001, gain.gain.value), t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
-      source.stop(t + 0.24);
+      master.gain.cancelScheduledValues(t);
+      master.gain.setValueAtTime(Math.max(0.001, master.gain.value), t);
+      master.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      for (const source of sources) {
+        try { source.stop(t + 0.48); } catch { /* already ended */ }
+      }
     } catch { /* already stopped */ }
   };
-  source.onended = () => {
-    try { source.disconnect(); highpass.disconnect(); lowpass.disconnect(); gain.disconnect(); } catch { /* already torn down */ }
-  };
-  return { stop, started: true, reason: 'playing' };
+  return { stop, started: true, reason: 'playing', cues };
 }
 
 function spawnBurst(particles, x, y, power, kind, narrow) {
@@ -328,7 +541,7 @@ export function openCelebration(dialog, { numbers, ticketIndex, colorOf, reduced
       if (launched.has(index) || t < burst.t) return;
       launched.add(index);
       if (reducedMotion || burst.kind === 'still') explode(burst.x * width, burst.y * height, burst.power, 'still');
-      else rockets.push({ x: burst.x * width + (Math.random() - 0.5) * 24, y: height + 8, tx: burst.x * width, ty: burst.y * height, age: 0, dur: 0.42 + Math.random() * 0.22, power: burst.power, kind: burst.kind, trail: [] });
+      else rockets.push({ x: burst.x * width + (Math.random() - 0.5) * 24, y: height + 8, tx: burst.x * width, ty: burst.y * height, age: 0, dur: plan.launchLead, power: burst.power, kind: burst.kind, trail: [] });
     });
     if (!reducedMotion && t < plan.confettiFor) {
       confettiDebt += plan.confettiPerSecond * dt;
@@ -472,7 +685,7 @@ export function openCelebration(dialog, { numbers, ticketIndex, colorOf, reduced
   let applause = { stop() {}, started: false, reason: 'unavailable' };
   const startApplause = () => {
     try {
-      applause = playApplause(audioContext, plan.applauseSeconds, reducedMotion);
+      applause = playCelebrationAudio(audioContext, plan);
       dialog.dataset.applause = applause.started ? 'playing' : 'unavailable';
     } catch {
       dialog.dataset.applause = 'blocked';
