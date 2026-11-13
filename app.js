@@ -11,6 +11,7 @@ import {CompatibleRenderer} from './compat.js?v=ref-shot-27';
 import {resetTickets,addTicket,finishTickets,getTicketsCopyText} from './tickets.js?v=button3';
 import {MAX_REHEARSAL_ENTRIES,parseTicketFields,extractTicketRowsFromOcr,mergeTicketRows,buildRehearsalDraw}from './ticket-input.js?v=ticket-grid-5';
 import {MUSIC_STORAGE_KEY,DEFAULT_TRACK_URL,DEFAULT_TRACK_NAME,MUSIC_LOOPS,clampVolume,readMusicPrefs,writeMusicPrefs,musicControlState} from './music-panel.js?v=music-panel-1';
+import { openCelebration } from './celebration.js?v=celebration-4';
 const $=id=>document.getElementById(id);
 const reds=new Set([1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46]);
 const blues=new Set([3,4,9,10,14,15,20,25,26,31,36,37,41,42,47,48]);
@@ -39,7 +40,7 @@ function placeMusicDock(){const dock=$('music-dock'),live=$('live-actions'),home
 const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 const RESULT_SHOT_DWELL_MS=3200;
 let resultShot=null,resultShotStable=false,resultShotStableAt=0,pendingStableFrame=null,resultReturnView='auto';
-let batchTotal=4,batchIndex=0,batchResults=[],batchActive=false,roundOrders=[],timelineAt=Date.now(),meditationRehearsalActive=false,rehearsalOrder=null,rehearsalEntries=[],prizeTicketIndex=0;
+let batchTotal=4,batchIndex=0,batchResults=[],batchActive=false,roundOrders=[],timelineAt=Date.now(),meditationRehearsalActive=false,rehearsalOrder=null,rehearsalEntries=[],prizeTicketIndex=0,celebrationHold=false,celebrationStop=null;
 function selectView(mode){view=mode;const shown=view;document.querySelectorAll('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===shown);b.setAttribute('aria-pressed',String(b.dataset.view===shown));});const names={auto:'自動運鏡',wide:'全景',close:'近鏡',orbit:'環繞',results:'收珠特寫'};const label=$('camera-summary');if(label)label.textContent=`鏡頭：${names[shown]||names[view]}`;$('result-focus').hidden=true;$('studio').classList.toggle('result-shot',view==='results');}
 function leaveResults(){resultShot=null;resultShotStable=false;resultShotStableAt=0;pendingStableFrame=null;$('result-focus').hidden=true;$('studio').classList.remove('result-shot');document.querySelector('[data-view="results"]').disabled=true;if(view==='results')selectView(resultReturnView);}
 function fillResultFocus(){const fill=(el,n)=>{el.textContent=String(n).padStart(2,'0');el.className='number '+colorOf(n);el.setAttribute('aria-label','號碼 '+n);};$('focus-numbers').innerHTML=revealed.slice(0,6).map(n=>`<div class="number ${colorOf(n)}" aria-label="正選號碼 ${n}">${String(n).padStart(2,'0')}</div>`).join('');fill($('focus-extra'),revealed[6]);$('focus-order').textContent='依出珠次序 · 即將排序';}
@@ -177,17 +178,24 @@ function beginRound(scroll=false){qaEvent('round-start',{round:batchIndex+1});
  if(soundOn)startAudio();if(scroll){$('studio').focus({preventScroll:true});$('studio').scrollIntoView({behavior:reducedMotion()?'auto':'smooth',block:'start'});}
 }
 function reset(){
+ abortCelebrationHold();
  machineOn=false;meditationRehearsalActive=false;rehearsalOrder=null;rehearsalEntries=[];prizeTicketIndex=0;userOrbit=false;orbit=null;orbitDrag=null;
  setLiveDrawDisplay(false);quickActive=false;quickSession=false;batchActive=false;batchIndex=0;batchResults=[];roundOrders=[];timelineAt=Date.now();leaveResults();clearCupBalls();phase='idle';paused=false;elapsed=0;order=[];revealed=[];nextIndex=0;extracting=null;clearNumbers();resetMachine();resetTickets(Number($('entry-count').value));
  $('entry-count').disabled=false;$('summary').classList.remove('copy-error');$('status').textContent='準備就緒';$('step').textContent='49 顆彩球 · 等候入鼓';$('instruction').textContent='準備就緒，等待抽獎開始。';$('start').disabled=false;setStartLabel();$('pause').disabled=true;$('pause').textContent='暫停';$('copy').disabled=true;$('summary').textContent='完成攪珠後，可按鈕揭曉每注，亦可一次複製全部號碼。';$('progressfill').style.width='0%';setMotor(0);setRolling(false);setEffectsActive(false);setStageStatus('待機／設定 · 小型構圖');const meditationStatus=$('meditation-status');if(meditationStatus)meditationStatus.textContent='每注輸入一組；彩排每次只開一注，隨機挑一注對獎。只屬模擬，不是真實開獎。';syncDrum();
  if(camera&&(view==='wide'||view==='auto')){camera.position.set(...WIDE_CAMERA_POS);cameraTarget.set(...WIDE_CAMERA_TARGET);camera.lookAt(cameraTarget);snapCamera=true;}
 }
+function completeBatchFinish(){
+ phase='done';batchActive=false;machineOn=false;finishTickets();setStageStatus(meditationRehearsalActive?'中獎彩排完成 · 你輸入的六個正選已出現':'本批已完成 · 球池已復位 · 各注結果保留在票券');setLiveDrawDisplay(false);$('entry-count').disabled=false;$('status').textContent=`${batchTotal} 注全部完成`;$('step').textContent='到下方按「揭曉」查看號碼';$('instruction').textContent=meditationRehearsalActive?'本次只開一注；按下方「揭曉」查看號碼。':'攪珠完成！機台已復位到完整 49 球池；按下方「揭曉」查看各注獨立票券。';$('start').disabled=false;setStartLabel();$('copy').disabled=false;$('summary').textContent=meditationRehearsalActive?'彩排只開一注；按「揭曉」查看，或複製號碼。':`已完成 ${batchTotal} 注，向下按鈕揭曉或一次複製全部；單式填寫只用每注六個正選。`;setMotor(0);setRolling(false);setEffectsActive(false);syncDrum();meditationRehearsalActive=false;rehearsalOrder=null;rehearsalEntries=[];prizeTicketIndex=0;
+}
 function finishRound({skipped=false}={}){
+ if(celebrationHold)return;
  if(!batchActive||phase!=='sorting'||(!revealComplete&&!skipped))return;
  revealComplete=false;
- if(skipped)qaEvent('result-reveal-skipped',{round:batchIndex+1});else qaEvent('result-shot-dwell-complete',{round:batchIndex+1,elapsed:performance.now()-resultShotStableAt});qaEvent('round-end',{round:batchIndex+1});const result={main:sortedMain(),extra:revealed[6],index:batchIndex+1};batchResults.push(result);addTicket({...result,order:revealed.slice()});clearCupBalls();resetMachine();batchIndex++;
+ if(skipped)qaEvent('result-reveal-skipped',{round:batchIndex+1});else qaEvent('result-shot-dwell-complete',{round:batchIndex+1,elapsed:performance.now()-resultShotStableAt});qaEvent('round-end',{round:batchIndex+1});const result={main:sortedMain(),extra:revealed[6],index:batchIndex+1};batchResults.push(result);addTicket({...result,order:revealed.slice()});
+ if(meditationRehearsalActive&&batchIndex+1>=batchTotal&&beginMeditationCelebration(batchResults,prizeTicketIndex+1))return;
+ clearCupBalls();resetMachine();batchIndex++;
  if(batchIndex<batchTotal){beginRound();return;}
- phase='done';batchActive=false;machineOn=false;finishTickets();setStageStatus(meditationRehearsalActive?'中獎彩排完成 · 你輸入的六個正選已出現':'本批已完成 · 球池已復位 · 各注結果保留在票券');setLiveDrawDisplay(false);$('entry-count').disabled=false;$('status').textContent=`${batchTotal} 注全部完成`;$('step').textContent='到下方按「揭曉」查看號碼';$('instruction').textContent=meditationRehearsalActive?'本次只開一注；按下方「揭曉」查看號碼。':'攪珠完成！機台已復位到完整 49 球池；按下方「揭曉」查看各注獨立票券。';$('start').disabled=false;setStartLabel();$('copy').disabled=false;$('summary').textContent=meditationRehearsalActive?'彩排只開一注；按「揭曉」查看，或複製號碼。':`已完成 ${batchTotal} 注，向下按鈕揭曉或一次複製全部；單式填寫只用每注六個正選。`;setMotor(0);setRolling(false);setEffectsActive(false);syncDrum();if(meditationRehearsalActive)runMeditationCelebration(batchResults,prizeTicketIndex+1);meditationRehearsalActive=false;rehearsalOrder=null;rehearsalEntries=[];prizeTicketIndex=0;
+ completeBatchFinish();
 }
 // Unadvertised one-ball interaction, independent of the selected ticket batch.
 function powerOn(){
@@ -482,7 +490,27 @@ function finishLineupCamera(){
  cameraTarget.set(...WIDE_CAMERA_TARGET);
  camera.lookAt(cameraTarget);
 }
+function frameCelebrationScene(){
+ if(!lineup)return;
+ for(const item of lineup.items){item.mesh.position.copy(item.to);faceLineupBall(item.mesh);}
+ const pose=lineup.pose,pull=1.22,lift=0.34;
+ const targetX=pose.target[0],targetY=pose.target[1]+lift,targetZ=pose.target[2];
+ camera.position.set(targetX+(pose.pos[0]-pose.target[0])*pull,targetY+(pose.pos[1]-pose.target[1])*pull,targetZ+(pose.pos[2]-pose.target[2])*pull);
+ cameraTarget.set(targetX,targetY,targetZ);
+ camera.lookAt(cameraTarget);
+}
+function presentCelebrationScene(){
+ if(revealed.length<7)return;
+ pendingLineup=false;ballClose=null;cameraHold=false;
+ if(!lineup)startLineup();
+ lineup.phase='hold';lineup.phaseStart=realTime;
+ if(lineupLabel)lineupLabel.visible=false;
+ hideTvDigits();
+ frameCelebrationScene();
+ if(renderer)renderer.render(scene,camera,true);
+}
 function updateLineup(){
+ if(celebrationHold){frameCelebrationScene();return;}
  const age=realTime-lineup.t0;
  const u=smooth(Math.min(1,age/LINEUP_MOVE));
  for(const item of lineup.items){
@@ -716,27 +744,41 @@ $('recognize-ticket-photo')?.addEventListener('click',async()=>{
 });
 $('ticket-photo')?.addEventListener('change',()=>{const file=$('ticket-photo').files?.[0],preview=$('ticket-photo-preview'),status=$('meditation-status');if(!file||!preview)return;if(preview.dataset.objectUrl)URL.revokeObjectURL(preview.dataset.objectUrl);const url=URL.createObjectURL(file);preview.dataset.objectUrl=url;preview.src=url;preview.hidden=false;if(status)status.textContent='已選好相片；按「辨識號碼」開始。';});
 $('meditation-clear')?.addEventListener('click',()=>{const status=$('meditation-status'),recognize=$('recognize-ticket-photo');if(recognize?.disabled){if(status)status.textContent='辨識中，完成後可清空注單。';return;}const photo=$('ticket-photo'),preview=$('ticket-photo-preview'),details=$('ocr-details'),raw=$('ocr-raw');setTicketGridRows([]);if(photo)photo.value='';if(preview){if(preview.dataset.objectUrl)URL.revokeObjectURL(preview.dataset.objectUrl);delete preview.dataset.objectUrl;preview.removeAttribute('src');preview.hidden=true;}if(details){details.open=false;details.hidden=true;}if(raw)raw.textContent='';if(status)status.textContent='已清空注單和相片，可重新輸入或選相。'});
-function closeMeditationCelebration(){const dialog=$('meditation-celebration');if(dialog){dialog.hidden=true;dialog.replaceChildren();}}
-function runMeditationCelebration(results,ticketIndex){
- const chosen=rehearsalEntries[ticketIndex-1],status=$('meditation-status');
- const match=results.length===1&&results[0].main.length===6&&results[0].main.slice().sort((a,b)=>a-b).every((n,i)=>n===chosen.slice().sort((a,b)=>a-b)[i]);
- if(!match){if(status)status.textContent='彩排結果未能對上指定注單，請再試一次。';return;}
- if(status)status.textContent=`彩排完成：只開一注，命中你輸入的第 ${ticketIndex} 注，恭喜！`;
- const dialog=$('meditation-celebration');if(!dialog)return;dialog.replaceChildren();
- const fireworks=document.createElement('div');fireworks.className='fireworks';fireworks.setAttribute('aria-hidden','true');
- for(let burst=0;burst<5;burst++){const group=document.createElement('span');group.className='firework-burst';group.style.setProperty('--burst-x',`${12+burst*19}%`);group.style.setProperty('--burst-y',`${22+(burst%2)*29}%`);for(let ray=0;ray<16;ray++){const spark=document.createElement('i');spark.style.setProperty('--angle',`${ray*22.5}deg`);spark.style.setProperty('--delay',`${burst*.22}s`);group.append(spark);}fireworks.append(group);}
- const content=document.createElement('div');content.className='celebration-card';
- const badge=document.createElement('span');badge.className='celebration-badge';badge.textContent='彩排命中';
- const heading=document.createElement('h2');heading.id='celebration-title';heading.textContent=`恭喜你中咗第 ${ticketIndex} 注頭獎啦！`;
- const label=document.createElement('p');label.className='celebration-label';label.textContent='六個正選全部對中';
- const numberRow=document.createElement('div');numberRow.className='celebration-numbers';numberRow.setAttribute('role','group');numberRow.setAttribute('aria-label','命中的六個正選號碼');
- match.main.forEach(number=>{const ball=document.createElement('span');ball.className='celebration-ball';ball.textContent=String(number).padStart(2,'0');numberRow.append(ball);});
- const specialRow=document.createElement('p');specialRow.className='celebration-special';specialRow.append(document.createTextNode('特別號 '));const special=document.createElement('span');special.className='celebration-special-ball';special.textContent=String(match.extra).padStart(2,'0');specialRow.append(special);
- const message=document.createElement('p');message.className='celebration-message';message.textContent=`今次只抽一組七球，命中你輸入的第 ${ticketIndex} 注；其他注沒有開出。好好享受呢個中獎情境——呢係模擬彩排，唔係真實開獎或中獎。`;
- const close=document.createElement('button');close.type='button';close.textContent='返回結果';close.addEventListener('click',closeMeditationCelebration);
- content.append(badge,heading,label,numberRow,specialRow,message,close);dialog.append(fireworks,content);dialog.hidden=false;close.focus();
+function abortCelebrationHold(){
+ celebrationStop?.();celebrationStop=null;
+ const dialog=$('meditation-celebration');
+ if(dialog&&!dialog.hidden){dialog.hidden=true;dialog.replaceChildren();}
+ if(!celebrationHold)return;
+ celebrationHold=false;
+ if(lineup||pendingLineup||ballClose)clearLineup();
 }
-document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('meditation-celebration')?.hidden)closeMeditationCelebration();});
+function closeMeditationCelebration(){
+ const dialog=$('meditation-celebration');
+ if(dialog){dialog.hidden=true;dialog.replaceChildren();}
+ celebrationStop?.();celebrationStop=null;
+ if(!celebrationHold)return;
+ celebrationHold=false;
+ if(lineup||pendingLineup||ballClose)clearLineup();
+ clearCupBalls();resetMachine();batchIndex++;
+ completeBatchFinish();
+ const reveal=$('tickets')?.querySelector('button');
+ if(reveal)reveal.focus();
+}
+function beginMeditationCelebration(results,ticketIndex){
+ const chosen=rehearsalEntries[ticketIndex-1],status=$('meditation-status');
+ const match=results.length===1&&results[0].main.length===6&&chosen&&results[0].main.slice().sort((a,b)=>a-b).every((n,i)=>n===chosen.slice().sort((a,b)=>a-b)[i]);
+ if(!match){if(status)status.textContent='彩排結果未能對上指定注單，請再試一次。';return false;}
+ const dialog=$('meditation-celebration');
+ if(!dialog)return false;
+ if(status)status.textContent=`彩排完成：只開一注，命中你輸入的第 ${ticketIndex} 注，恭喜！`;
+ celebrationHold=true;phase='celebrating';
+ presentCelebrationScene();
+ if(audio&&audio.state==='suspended')audio.resume().catch(()=>{});
+ celebrationStop=openCelebration(dialog,{numbers:results[0].main,ticketIndex,colorOf,reducedMotion:reducedMotion(),audioContext:audio,onClose:closeMeditationCelebration});
+ setStageStatus('中獎彩排完成 · 恭喜你中頭獎');
+ return true;
+}
+document.addEventListener('keydown',event=>{if(event.key!=='Escape'||$('meditation-celebration')?.hidden)return;event.preventDefault();event.stopPropagation();closeMeditationCelebration();},true);
 document.addEventListener('ticket:revealed',revealCupTicket);$('fullscreen-toggle')?.addEventListener('click',toggleImmersiveMode);document.addEventListener('fullscreenchange',handleFullscreenChange);document.addEventListener('keydown',handleImmersiveEscape);window.addEventListener('resize',syncImmersiveLayout);$('start').addEventListener('click',begin);$('reset').addEventListener('click',reset);$('live-pause')?.addEventListener('click',()=>$('pause').click());$('live-reset')?.addEventListener('click',()=>$('reset').click());$('live-settings-toggle')?.addEventListener('click',()=>{const overlay=$('live-settings-overlay');if(!overlay)return;overlay.hidden=!overlay.hidden;const settings=$('inline-settings');if(settings)settings.open=!overlay.hidden;$('live-settings-toggle').setAttribute('aria-expanded',String(!overlay.hidden));});$('settings-close')?.addEventListener('click',()=>{const settings=$('inline-settings');if(settings)settings.open=false;const overlay=$('live-settings-overlay');if(overlay)overlay.hidden=true;const toggle=$('live-settings-toggle');if(toggle)toggle.setAttribute('aria-expanded','false');});$('pause').addEventListener('click',()=>{updateTimeline();if(phase!=='running')return;paused=!paused;timelineAt=Date.now();syncDrum();$('pause').textContent=paused?'繼續攪珠':'暫停';if($('live-pause'))$('live-pause').textContent=paused?'繼續':'暫停';$('status').textContent=paused?'已暫停':'攪拌中';if(paused){setMotor(0);setRolling(false);setEffectsActive(false);}else{ensureEffects();if(soundOn)startAudio();}});$('speed').addEventListener('change',e=>{updateTimeline();rate=Number(e.target.value);updateTiming();});$('sound').addEventListener('click',toggleMusic);$('music-play')?.addEventListener('click',toggleMusic);$('music-settings')?.addEventListener('click',toggleMusicSettings);$('music-popover-close')?.addEventListener('click',closeMusicSettings);$('music-use-default')?.addEventListener('click',useDefaultTrack);$('music-volume')?.addEventListener('input',()=>{soundtrack.volume=clampVolume(Number($('music-volume').value)/100);persistMusic();});$('music-pick')?.addEventListener('click',()=>$('music-file')?.click());$('music-file')?.addEventListener('change',()=>{const file=$('music-file').files&&$('music-file').files[0];useTrackFile(file);$('music-file').value='';});soundtrack.addEventListener('play',syncMusicUi);soundtrack.addEventListener('pause',syncMusicUi);document.addEventListener('pointerdown',e=>{const pop=$('music-popover'),dock=$('music-dock');if(!pop||pop.hidden||(dock&&dock.contains(e.target)))return;closeMusicSettings();});syncMusicUi();nudgeMusic();document.addEventListener('click',nudgeMusic);document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{if(phase==='sorting'&&b.dataset.view!=='results')return;userOrbit=false;orbit=null;orbitDrag=null;snapCamera=true;if(b.dataset.view!=='results')resultShot=null;selectView(b.dataset.view);}));$('scene').addEventListener('pointermove',e=>{const r=$('scene').getBoundingClientRect();mouseX=((e.clientX-r.left)/r.width-.5)*2;});$('scene').addEventListener('pointerleave',()=>mouseX=0);
 $('entry-count').addEventListener('change',()=>{if(!batchActive&&!quickActive){meditationRehearsalActive=false;rehearsalOrder=null;setStartLabel();resetTickets(Number($('entry-count').value));}});
 // Pointer-down is the manual fast-start; pointer-up/click must not draw twice.
