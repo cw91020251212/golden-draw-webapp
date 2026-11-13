@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseTicketEntries, parseTicketFields, extractTicketRowsFromOcr, mergeTicketRows, buildRehearsalOrder, MAX_REHEARSAL_ENTRIES } from './ticket-input.js';
+import { buildRehearsalDraw } from './ticket-input.js';
 
 test('parses six adjacent two-digit fields and skips untouched rows', () => {
   assert.deepEqual(parseTicketFields([
@@ -102,6 +103,17 @@ test('rehearsal order randomizes the selected ticket and chooses a distinct extr
     assert.ok(!chosen.includes(order[6]));
   }
   assert.notDeepEqual(firstOrder, secondOrder);
+});
+
+test('buildRehearsalDraw selects one input ticket and returns one seven-ball draw', () => {
+  const first = [1, 2, 3, 4, 5, 6];
+  const second = [8, 15, 23, 31, 42, 47];
+  const plan = buildRehearsalDraw([first, second], n => n === 2 ? 1 : 0);
+  assert.equal(plan.prizeTicketIndex, 1);
+  assert.equal(plan.order.length, 7);
+  assert.equal(new Set(plan.order).size, 7);
+  assert.deepEqual(plan.order.slice(0, 6).sort((a, b) => a - b), second);
+  assert.ok(!second.includes(plan.order[6]));
 });
 
 test('buildRehearsalOrder rejects invalid selections and random indices', () => {

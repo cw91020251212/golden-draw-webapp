@@ -97,6 +97,18 @@ export function mergeTicketRows(primary, supplemental) {
   return merged;
 }
 
+export function buildRehearsalDraw(entries, randomBelow) {
+  if (!Array.isArray(entries) || !entries.length) throw new TypeError('彩排至少需要一注號碼');
+  if (entries.length > MAX_REHEARSAL_ENTRIES) throw new Error(`每次彩排最多 ${MAX_REHEARSAL_ENTRIES} 注，請分批輸入。`);
+  if (entries.some(entry => !isValidEntry(entry))) throw new TypeError('彩排注單必須是六個不同的 1–49 號碼');
+  if (typeof randomBelow !== 'function') throw new TypeError('需要提供亂數選擇函式');
+  const prizeTicketIndex = randomBelow(entries.length);
+  if (!Number.isInteger(prizeTicketIndex) || prizeTicketIndex < 0 || prizeTicketIndex >= entries.length) {
+    throw new RangeError('中獎注索引超出範圍');
+  }
+  return { prizeTicketIndex, order: buildRehearsalOrder(entries[prizeTicketIndex], randomBelow) };
+}
+
 export function buildRehearsalOrder(chosen, randomBelow) {
   if (!isValidEntry(chosen)) throw new TypeError('中獎彩排注必須包含六個不同的 1–49 號碼');
   if (typeof randomBelow !== 'function') throw new TypeError('需要提供亂數選擇函式');
