@@ -626,10 +626,25 @@ button.fullscreen-toggle:hover{background:#f4f1e933}
 .studio.is-immersive .stage-top{top:calc(env(safe-area-inset-top,0px) + 10px);left:14px;right:14px;z-index:12;align-items:center;gap:8px}
 .studio.is-immersive .stage-top-actions{gap:10px}
 .studio.is-immersive .stage-top-actions #step{max-width:min(38vw,320px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
-.studio.is-immersive button.fullscreen-toggle{min-width:112px;min-height:48px;font-size:15px;background:#17313fdc}
+button.fullscreen-toggle{min-width:112px;min-height:48px;font-size:15px;background:#17313fdc}
+/* Keep the exit control in the unused upper-right corner; compact status stays on the left. */
+.studio.is-immersive .stage-top{display:block;left:12px;right:12px;pointer-events:none}
+.studio.is-immersive .stage-top>span:first-child,
+.studio.is-immersive .stage-top-actions #step{display:block;width:fit-content;max-width:calc(100% - 60px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:7px;padding:3px 7px;background:#102b3bc2;font-size:11px;line-height:1.25;letter-spacing:0;text-align:left}
+.studio.is-immersive .stage-top-actions{position:static;display:block;margin-top:4px;pointer-events:none}
+.studio.is-immersive button.fullscreen-toggle{position:absolute;top:0;right:0;width:44px;min-width:44px;height:44px;min-height:44px;padding:6px;font-size:12px;letter-spacing:0;background:#17313fe8;box-shadow:0 2px 8px #0004;pointer-events:auto}
 .studio.is-immersive .stage-caption{position:absolute;z-index:10;left:0;right:0;bottom:0;height:calc(64px + env(safe-area-inset-bottom,0px));padding:0 10px calc(env(safe-area-inset-bottom,0px));display:flex;align-items:center;justify-content:space-between;gap:8px;background:linear-gradient(90deg,#122d3bf5,#173744f0);border-top:1px solid #ffffff2b;font-size:13px;letter-spacing:0;pointer-events:none}
 .studio.is-immersive #scene-status{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .studio.is-immersive #scene-shot,.studio.is-immersive #orbit-reset{display:none}
+.studio.is-immersive .stage-caption{font-size:11px}
+.studio.is-immersive button.fullscreen-toggle{display:grid;place-items:center;border-radius:10px}
+button.fullscreen-toggle{display:grid;place-items:center;width:44px;min-width:44px;height:44px;min-height:44px;padding:6px;border-radius:10px}
+.fullscreen-toggle svg{display:block;width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fullscreen-icon-collapse{display:none}
+.fullscreen-toggle[data-fullscreen-mode="native"] .fullscreen-icon-expand,
+.fullscreen-toggle[data-fullscreen-mode="css-fallback"] .fullscreen-icon-expand{display:none}
+.fullscreen-toggle[data-fullscreen-mode="native"] .fullscreen-icon-collapse,
+.fullscreen-toggle[data-fullscreen-mode="css-fallback"] .fullscreen-icon-collapse{display:block}
 .studio.is-immersive .live-actions:not([hidden]){position:relative;z-index:1;display:flex;flex:0 0 auto;align-items:center;gap:6px;pointer-events:auto}
 .studio.is-immersive .live-actions>button{min-width:64px;min-height:48px;padding:6px 9px;border:1px solid #f4f1e966;border-radius:8px;background:#f4f1e91c;color:#fff8e8;font-size:14px;line-height:1.1;white-space:nowrap;pointer-events:auto;touch-action:manipulation}
 .studio.is-immersive .live-actions>button:active{transform:translateY(1px)}
@@ -657,5 +672,6 @@ body.immersive-view .layout>.scene-column{display:block;width:100%;height:100%;m
 /* The compact automatic live view uses the same minimum tap target. */
 body.live-draw #live-actions>#live-settings-toggle{min-width:48px;min-height:44px;height:44px;pointer-events:auto}
 
+body.live-draw .stage-caption #scene-status,body.immersive-view .stage-caption #scene-status{display:none!important}
 /* Keep vertical swipes available for page scrolling in browser mode; fullscreen owns the gesture surface. */
 body.immersive-view #scene{touch-action:none}
