@@ -619,20 +619,18 @@ body.live-draw #live-actions .music-popover button{width:auto;min-width:0;max-wi
 
 /* Local preview: viewport immersion with a persistent exit control. */
 .stage-top-actions{display:flex;align-items:center;gap:12px}
-button.fullscreen-toggle{position:relative;z-index:12;min-width:92px;min-height:44px;padding:8px 12px;border:1px solid #f4f1e966;border-radius:10px;background:#f4f1e91c;color:#fff8e8;font-size:14px;font-weight:700;letter-spacing:0;white-space:nowrap;pointer-events:auto;touch-action:manipulation}
-button.fullscreen-toggle:hover{background:#f4f1e933}
+button.fullscreen-toggle{position:relative;z-index:12;width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border:1px solid rgba(255,255,255,.92);border-radius:6px;background:transparent;color:#fff;font-size:14px;font-weight:700;letter-spacing:0;white-space:nowrap;pointer-events:auto;touch-action:manipulation}
 .studio.is-immersive{position:fixed;inset:0;z-index:1000;width:100vw;height:100dvh;min-height:0;max-height:none;border:0;border-radius:0;overflow:hidden;scroll-margin:0}
 .studio.is-immersive #scene{inset:0 0 calc(64px + env(safe-area-inset-bottom,0px)) 0;width:100%;height:auto}
 .studio.is-immersive .stage-top{top:calc(env(safe-area-inset-top,0px) + 10px);left:14px;right:14px;z-index:12;align-items:center;gap:8px}
 .studio.is-immersive .stage-top-actions{gap:10px}
 .studio.is-immersive .stage-top-actions #step{max-width:min(38vw,320px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
-button.fullscreen-toggle{min-width:112px;min-height:48px;font-size:15px;background:#17313fdc}
 /* Keep the exit control in the unused upper-right corner; compact status stays on the left. */
 .studio.is-immersive .stage-top{display:block;left:12px;right:12px;pointer-events:none}
 .studio.is-immersive .stage-top>span:first-child,
 .studio.is-immersive .stage-top-actions #step{display:block;width:fit-content;max-width:calc(100% - 60px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:7px;padding:3px 7px;background:#102b3bc2;font-size:11px;line-height:1.25;letter-spacing:0;text-align:left}
 .studio.is-immersive .stage-top-actions{position:static;display:block;margin-top:4px;pointer-events:none}
-.studio.is-immersive button.fullscreen-toggle{position:absolute;top:0;right:0;width:44px;min-width:44px;height:44px;min-height:44px;padding:6px;font-size:12px;letter-spacing:0;background:#17313fe8;box-shadow:0 2px 8px #0004;pointer-events:auto}
+.studio.is-immersive button.fullscreen-toggle{position:absolute;top:0;right:0;pointer-events:auto}
 .studio.is-immersive .stage-caption{position:absolute;z-index:10;left:0;right:0;bottom:0;height:calc(64px + env(safe-area-inset-bottom,0px));padding:0 10px calc(env(safe-area-inset-bottom,0px));display:flex;align-items:center;justify-content:space-between;gap:8px;background:linear-gradient(90deg,#122d3bf5,#173744f0);border-top:1px solid #ffffff2b;font-size:13px;letter-spacing:0;pointer-events:none}
 .studio.is-immersive #scene-status{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .studio.is-immersive #scene-shot,.studio.is-immersive #orbit-reset{display:none}
