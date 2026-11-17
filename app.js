@@ -715,19 +715,45 @@ $('recognize-ticket-photo')?.addEventListener('click',async()=>{
     if(status)status.textContent='正在放大號碼區再辨識…';
     const bitmap=await createImageBitmap(file);
     try{
-     const boxes=scatteredTicketLines.map(line=>line.bbox).filter(box=>box&&Number.isFinite(box.x0)&&Number.isFinite(box.y0));
-     const minX=Math.min(...boxes.map(box=>box.x0)),maxX=Math.max(...boxes.map(box=>box.x1));
-     const minY=Math.min(...boxes.map(box=>box.y0)),maxY=Math.max(...boxes.map(box=>box.y1));
-     const meanLineHeight=boxes.reduce((sum,box)=>sum+box.y1-box.y0,0)/boxes.length;
-     const padX=Math.max(8,Math.round((maxX-minX)*0.025)),padY=Math.max(5,Math.round(meanLineHeight*0.45));
-     const left=Math.max(0,Math.floor(minX-padX)),top=Math.max(0,Math.floor(minY-padY));
-     const right=Math.min(bitmap.width,Math.ceil(maxX+padX)),bottom=Math.min(bitmap.height,Math.ceil(maxY+padY));
-     const width=right-left,height=bottom-top;
-     if(width>0&&height>0){
-      const scale=Math.min(4,Math.max(1,1800/width)),canvas=document.createElement('canvas');
-      canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round(height*scale));
-      const context=canvas.getContext('2d');
-      if(context){context.fillStyle='#fff';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(bitmap,left,top,width,height,0,0,canvas.width,canvas.height);const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(blob){const focused=await worker.recognize(blob,{}, {blocks:true});focusedText=String(focused.data.text||'');}}
+     const boxes=scatteredTicketLines.map(line=>line.bbox).filter(box=>box&&Number.isFinite(box.x0)&&Number.isFinite(box.y0)&&Number.isFinite(box.x1)&&Number.isFinite(box.y1));
+     if(boxes.length>=2){
+      const minX=Math.min(...boxes.map(box=>box.x0)),maxX=Math.max(...boxes.map(box=>box.x1));
+      const minY=Math.min(...boxes.map(box=>box.y0)),maxY=Math.max(...boxes.map(box=>box.y1));
+      const meanLineHeight=boxes.reduce((sum,box)=>sum+box.y1-box.y0,0)/boxes.length;
+      const padX=Math.max(8,Math.round((maxX-minX)*0.025)),padY=Math.max(5,Math.round(meanLineHeight*0.45));
+      const left=Math.max(0,Math.floor(minX-padX)),top=Math.max(0,Math.floor(minY-padY));
+      const right=Math.min(bitmap.width,Math.ceil(maxX+padX)),bottom=Math.min(bitmap.height,Math.ceil(maxY+padY));
+      const width=right-left,height=bottom-top;
+      if(width>0&&height>0&&meanLineHeight>0){
+       const scale=Math.min(4,Math.max(1,1800/width)),canvas=document.createElement('canvas');
+       canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round(height*scale));
+       const context=canvas.getContext('2d');
+       if(context){
+        context.fillStyle='#fff';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(bitmap,left,top,width,height,0,0,canvas.width,canvas.height);
+        const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+        if(blob){
+         const focused=await worker.recognize(blob,{}, {blocks:true});focusedText=String(focused.data.text||'');
+         const initialRows=extractTicketRowsFromOcr(focusedText);
+         if(initialRows.length<scatteredTicketLines.length){
+          const centres=new Set();
+          for(const line of scatteredTicketLines){const centre=(line.bbox.y0+line.bbox.y1)/2;for(let offset=-2;offset<=2;offset++)centres.add(Math.round(centre+offset*meanLineHeight));}
+          const rowTexts=[],rowCanvas=document.createElement('canvas'),rowPad=Math.max(4,Math.round(meanLineHeight*0.4));
+          await worker.setParameters({tessedit_pageseg_mode:'7'});
+          for(const centre of [...centres].sort((a,b)=>a-b)){
+           const rowTop=Math.max(0,Math.floor(centre-meanLineHeight/2-rowPad)),rowBottom=Math.min(bitmap.height,Math.ceil(centre+meanLineHeight/2+rowPad)),rowHeight=rowBottom-rowTop;
+           if(rowHeight<=0)continue;
+           rowCanvas.width=Math.max(1,Math.round(width*scale));rowCanvas.height=Math.max(1,Math.round(rowHeight*scale));
+           const rowContext=rowCanvas.getContext('2d');if(!rowContext)continue;
+           rowContext.fillStyle='#fff';rowContext.fillRect(0,0,rowCanvas.width,rowCanvas.height);rowContext.imageSmoothingEnabled=true;rowContext.imageSmoothingQuality='high';rowContext.drawImage(bitmap,left,rowTop,width,rowHeight,0,0,rowCanvas.width,rowCanvas.height);
+           const rowBlob=await new Promise(resolve=>rowCanvas.toBlob(resolve,'image/png'));if(!rowBlob)continue;
+           const result=await worker.recognize(rowBlob),text=String(result.data.text||'').trim();
+           if((text.match(/\+/g)||[]).length>=3&&extractTicketRowsFromOcr(text).length===1)rowTexts.push(text);
+          }
+          const rowText=rowTexts.join('\n');if(extractTicketRowsFromOcr(rowText).length>initialRows.length)focusedText=rowText;
+         }
+        }
+       }
+      }
      }
     }finally{bitmap.close?.();}
    }catch{}
