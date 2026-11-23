@@ -27,6 +27,7 @@ html, body {
 #view {
   z-index: 1;
   pointer-events: none;
+  background: transparent;
 }
 
 #look {
@@ -132,6 +133,16 @@ button, .check {
   border: 1px solid #f4f0e855;
   border-radius: 999px;
   padding: 12px 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+#start-note:not(:empty) {
+  color: #f4f0e8;
+  font-size: 16px;
+  background: #3a2a14;
+  border-radius: 12px;
+  padding: 10px 12px;
 }
 
 button.primary {

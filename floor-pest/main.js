@@ -46,7 +46,14 @@ const pickupButton = document.querySelector('#pickup');
 const swatButton = document.querySelector('#swat');
 const dropButton = document.querySelector('#drop');
 
-const view = createView(document.querySelector('#view'));
+let view;
+try {
+  view = createView(document.querySelector('#view'));
+} catch (error) {
+  window.__floorBootError = error instanceof Error ? error.message : String(error);
+  startNote.textContent = '畫面開唔到：' + window.__floorBootError;
+  throw error;
+}
 const audio = createAudio();
 const showDebug = new URLSearchParams(location.search).has('debug');
 debug.hidden = !showDebug;
@@ -98,23 +105,77 @@ async function askPermission(Ctor, absolute) {
   }
 }
 
-async function startCamera() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return false;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      }
-    });
-    cam.srcObject = stream;
-    await cam.play();
-    return true;
-  } catch {
-    return false;
+function releaseStream(target) {
+  if (!target) return;
+  for (const track of target.getTracks()) track.stop();
+  if (stream === target) {
+    stream = null;
+    cam.srcObject = null;
   }
+}
+
+function stopCamera() {
+  releaseStream(stream);
+}
+
+async function startCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return null;
+  let acquired = null;
+  try {
+    acquired = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: 'environment' } }
+    });
+    cam.playsInline = true;
+    cam.muted = true;
+    stream = acquired;
+    cam.srcObject = acquired;
+    try {
+      await Promise.race([
+        cam.play(),
+        new Promise((resolve) => setTimeout(resolve, 700))
+      ]);
+    } catch {
+      releaseStream(acquired);
+      return null;
+    }
+    if (stream !== acquired) {
+      releaseStream(acquired);
+      return null;
+    }
+    return acquired;
+  } catch {
+    releaseStream(acquired);
+    return null;
+  }
+}
+
+function withTimeout(promise, ms) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(null);
+    }, ms);
+    promise.then(
+      (value) => {
+        if (settled) {
+          releaseStream(value);
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(null);
+      }
+    );
+  });
 }
 
 async function pulseTorch() {
@@ -273,7 +334,15 @@ function updateChrome(slipper) {
   }
 }
 
+function status(text) {
+  startNote.textContent = text;
+  promptOverride = text;
+  promptUntil = performance.now() + 20000;
+}
+
 function begin(useMouse) {
+  startNote.textContent = '';
+  promptOverride = '';
   forceMouse = useMouse;
   const mouse = useMouse || !view.hasOrientation();
   view.setMouseLook(mouse);
@@ -287,54 +356,49 @@ function begin(useMouse) {
 
 let bootToken = 0;
 
-function stopCamera() {
-  if (!stream) return;
-  for (const track of stream.getTracks()) track.stop();
-  stream = null;
-  cam.srcObject = null;
-}
-
-async function boot(useMouse) {
+async function openRound(cameraPromise) {
   const token = ++bootToken;
-  await audio.resume();
+  await audio.resume().catch(() => {});
   if (token !== bootToken) return;
-  if (useMouse) {
-    stopCamera();
-    begin(true);
-    return;
-  }
-  const opened = await startCamera();
+  const opened = await withTimeout(cameraPromise, 8000);
   if (token !== bootToken) {
-    if (opened) stopCamera();
+    releaseStream(opened);
     return;
   }
   if (!opened) {
-    startNote.textContent = '開唔到後鏡頭。可以改用滑鼠彩排。';
+    status('開唔到後鏡頭。撳「冇鏡頭，用滑鼠彩排」都可以玩。如果冇彈出詢問，請喺瀏覽器設定准呢個網站用相機。');
     return;
   }
-  await delay(500);
+  await delay(300);
   if (token !== bootToken) {
-    stopCamera();
+    releaseStream(opened);
     return;
   }
-  // Keep the camera up. Drag is the stand-in until a direction event arrives,
-  // and that later event can still take over because this is not rehearsal.
+  // Drag remains the stand-in until a direction event arrives, and that later
+  // event can still take over because this is not rehearsal.
   begin(false);
 }
 
-document.querySelector('#start').addEventListener('click', async () => {
+document.querySelector('#start').addEventListener('click', () => {
   const button = document.querySelector('#start');
+  status('開緊後鏡頭…如果彈出詢問，請撳允許。');
+  const orientation = askPermission(window.DeviceOrientationEvent, true);
+  const motion = askPermission(window.DeviceMotionEvent, false);
+  const camera = startCamera();
   button.disabled = true;
-  await askPermission(window.DeviceOrientationEvent, true);
-  await askPermission(window.DeviceMotionEvent, false);
-  try {
-    await boot(false);
-  } finally {
+  orientation.catch(() => {});
+  motion.catch(() => {});
+  openRound(camera).finally(() => {
     button.disabled = false;
-  }
+  });
 });
 
-document.querySelector('#rehearse').addEventListener('click', () => boot(true));
+document.querySelector('#rehearse').addEventListener('click', () => {
+  bootToken += 1;
+  stopCamera();
+  begin(true);
+  audio.resume().catch(() => {});
+});
 
 document.querySelector('#mark').addEventListener('click', () => {
   const bearing = view.bearing();
@@ -538,3 +602,5 @@ function frame(now) {
 }
 
 requestAnimationFrame(frame);
+window.__floorBoot = true;
+if (startNote.textContent.indexOf('載入') !== -1) startNote.textContent = '';

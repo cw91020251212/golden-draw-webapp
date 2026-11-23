@@ -67,6 +67,32 @@
     <button id="light" type="button" hidden>光</button>
     <div id="debug" hidden></div>
   </div>
+  <script>
+    (function () {
+      var note = document.querySelector('#start-note');
+      var gaveUp = false;
+      function say(text) {
+        if (note && window.__floorBoot !== true) note.textContent = text;
+      }
+      function onDeadClick() {
+        if (window.__floorBoot === true) return;
+        say(window.__floorBootError
+          ? '程式出錯：' + window.__floorBootError
+          : (gaveUp
+            ? '程式未載入，所以撳掣冇反應。請用 Safari 或 Chrome 打開呢條網址，唔好喺 GitHub、微信或者下載嘅檔案入面開。'
+            : '程式仲載入緊。等呢行字消失，再撳一次。'));
+      }
+      document.querySelector('#start').addEventListener('click', onDeadClick);
+      document.querySelector('#rehearse').addEventListener('click', onDeadClick);
+      setTimeout(function () {
+        if (window.__floorBoot === true) return;
+        gaveUp = true;
+        say(window.__floorBootError
+          ? '程式出錯：' + window.__floorBootError
+          : '程式載入太耐。如果撳兩粒掣都冇轉變，請用 Safari 或 Chrome 重新打開呢條網址。');
+      }, 12000);
+    })();
+  </script>
   <script src="main.js" type="module"></script>
 </body>
 </html>
