@@ -285,19 +285,41 @@ function begin(useMouse) {
   show('mark');
 }
 
+let bootToken = 0;
+
+function stopCamera() {
+  if (!stream) return;
+  for (const track of stream.getTracks()) track.stop();
+  stream = null;
+  cam.srcObject = null;
+}
+
 async function boot(useMouse) {
+  const token = ++bootToken;
   await audio.resume();
+  if (token !== bootToken) return;
   if (useMouse) {
+    stopCamera();
     begin(true);
     return;
   }
   const opened = await startCamera();
+  if (token !== bootToken) {
+    if (opened) stopCamera();
+    return;
+  }
   if (!opened) {
     startNote.textContent = '開唔到後鏡頭。可以改用滑鼠彩排。';
     return;
   }
   await delay(500);
-  begin(!view.hasOrientation());
+  if (token !== bootToken) {
+    stopCamera();
+    return;
+  }
+  // Keep the camera up. Drag is the stand-in until a direction event arrives,
+  // and that later event can still take over because this is not rehearsal.
+  begin(false);
 }
 
 document.querySelector('#start').addEventListener('click', async () => {

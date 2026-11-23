@@ -222,9 +222,30 @@ export function createView(canvas) {
     slipper.rotation.y = Math.atan2(point.x, point.z);
   }
 
-  function bugMesh(kind) {
-    return kind === 'spider' ? makeSpider() : makeRoach();
+function bugMesh(kind) {
+  return kind === 'spider' ? makeSpider() : makeRoach();
+}
+
+function collectResources(root, geometries, materials) {
+  root.traverse((child) => {
+    if (child.geometry) geometries.add(child.geometry);
+    if (!child.material) return;
+    const list = Array.isArray(child.material) ? child.material : [child.material];
+    for (const material of list) materials.add(material);
+  });
+}
+
+function releaseGroup(mesh, keepGeometries, keepMaterials) {
+  const geometries = new Set();
+  const materials = new Set();
+  collectResources(mesh, geometries, materials);
+  for (const geometry of geometries) {
+    if (!keepGeometries.has(geometry)) geometry.dispose();
   }
+  for (const material of materials) {
+    if (!keepMaterials.has(material)) material.dispose();
+  }
+}
 
   return {
     resize,
@@ -281,11 +302,16 @@ export function createView(canvas) {
         mesh.scale.set(1 + squash * 0.45, 1 - squash * 0.72, 1 + squash * 0.45);
         for (const solid of mesh.userData.solids) solid.visible = !silhouette;
       }
+      const keepGeometries = new Set();
+      const keepMaterials = new Set();
       for (const [id, mesh] of meshes) {
-        if (!live.has(id)) {
-          scene.remove(mesh);
-          meshes.delete(id);
-        }
+        if (live.has(id)) collectResources(mesh, keepGeometries, keepMaterials);
+      }
+      for (const [id, mesh] of meshes) {
+        if (live.has(id)) continue;
+        scene.remove(mesh);
+        meshes.delete(id);
+        releaseGroup(mesh, keepGeometries, keepMaterials);
       }
     },
     render() {
