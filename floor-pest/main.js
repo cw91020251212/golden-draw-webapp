@@ -118,7 +118,7 @@ function stopCamera() {
   releaseStream(stream);
 }
 
-async function startCamera() {
+async function startCamera(attempt) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return null;
   let acquired = null;
   try {
@@ -126,20 +126,19 @@ async function startCamera() {
       audio: false,
       video: { facingMode: { ideal: 'environment' } }
     });
+    if (attempt !== bootToken) {
+      releaseStream(acquired);
+      return null;
+    }
     cam.playsInline = true;
     cam.muted = true;
     stream = acquired;
     cam.srcObject = acquired;
-    try {
-      await Promise.race([
-        cam.play(),
-        new Promise((resolve) => setTimeout(resolve, 700))
-      ]);
-    } catch {
-      releaseStream(acquired);
-      return null;
-    }
-    if (stream !== acquired) {
+    const played = await Promise.race([
+      cam.play().then(() => true).catch(() => false),
+      new Promise((resolve) => setTimeout(() => resolve(false), 1500))
+    ]);
+    if (!played || stream !== acquired || attempt !== bootToken) {
       releaseStream(acquired);
       return null;
     }
@@ -356,8 +355,7 @@ function begin(useMouse) {
 
 let bootToken = 0;
 
-async function openRound(cameraPromise) {
-  const token = ++bootToken;
+async function openRound(token, cameraPromise) {
   await audio.resume().catch(() => {});
   if (token !== bootToken) return;
   const opened = await withTimeout(cameraPromise, 8000);
@@ -384,11 +382,12 @@ document.querySelector('#start').addEventListener('click', () => {
   status('開緊後鏡頭…如果彈出詢問，請撳允許。');
   const orientation = askPermission(window.DeviceOrientationEvent, true);
   const motion = askPermission(window.DeviceMotionEvent, false);
-  const camera = startCamera();
+  const token = ++bootToken;
+  const camera = startCamera(token);
   button.disabled = true;
   orientation.catch(() => {});
   motion.catch(() => {});
-  openRound(camera).finally(() => {
+  openRound(token, camera).finally(() => {
     button.disabled = false;
   });
 });
