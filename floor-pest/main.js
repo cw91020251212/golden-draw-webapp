@@ -100,8 +100,9 @@ async function askPermission(Ctor, absolute) {
 
 async function startCamera() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return false;
+  let acquired = null;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
+    acquired = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
         facingMode: { ideal: 'environment' },
@@ -109,10 +110,18 @@ async function startCamera() {
         height: { ideal: 720 }
       }
     });
-    cam.srcObject = stream;
+    stream = acquired;
+    cam.srcObject = acquired;
     await cam.play();
     return true;
   } catch {
+    if (acquired) {
+      for (const track of acquired.getTracks()) track.stop();
+      if (stream === acquired) {
+        stream = null;
+        cam.srcObject = null;
+      }
+    }
     return false;
   }
 }
