@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="theme-color" content="#12110f">
+  <title>地板蟲害</title>
+  <link rel="stylesheet" href="game.css">
+</head>
+<body>
+  <video id="cam" playsinline muted autoplay></video>
+  <canvas id="view"></canvas>
+  <div id="look" hidden></div>
+  <div id="flash"></div>
+  <div id="glass" hidden>
+    <div class="climber"><div id="climber" class="bug-body"></div></div>
+    <p id="glass-text">佢上咗塊玻璃</p>
+    <button type="button" id="flick">篤走佢</button>
+  </div>
+  <div id="ui">
+    <div id="top" hidden>
+      <span id="hud-roaches">曱甴 1</span>
+      <span id="hud-spider">蜘蛛 未出</span>
+      <span id="hud-glass">玻璃 0/2</span>
+      <button type="button" id="silhouette-live">只見影</button>
+    </div>
+    <p id="prompt"></p>
+    <div id="panel">
+      <section class="screen" id="screen-start">
+        <h1>地板蟲害</h1>
+        <p>企定轉身。用拖鞋清走地下嘅曱甴同蜘蛛。</p>
+        <p class="quiet">鏡頭畫面留喺部電話，唔會上傳，亦唔會錄低。建議戴耳機。行開嘅話，蟲會相對地磚溜位。</p>
+        <label class="check"><input id="silhouette" type="checkbox"> 只見影</label>
+        <button class="primary" id="start" type="button">開鏡頭，開始</button>
+        <button id="rehearse" type="button">冇鏡頭，用滑鼠彩排</button>
+        <p class="quiet" id="start-note"></p>
+      </section>
+      <section class="screen" id="screen-mark" hidden>
+        <p id="mark-copy"></p>
+        <button class="primary" id="mark" type="button">標呢個方向</button>
+      </section>
+      <section class="screen" id="screen-fit" hidden>
+        <p>低頭望住一步外嘅地磚。拖鞋如果坐得太近，撳「近咗」。</p>
+        <div class="row">
+          <button id="closer" type="button">近咗</button>
+          <button id="farther" type="button">遠咗</button>
+        </div>
+        <div class="row">
+          <button id="wider" type="button">視野闊啲</button>
+          <button id="narrower" type="button">視野窄啲</button>
+        </div>
+        <button class="primary" id="fit-ok" type="button">岩好</button>
+      </section>
+      <div id="play-actions" hidden>
+        <button class="primary" id="stamp" type="button">踩</button>
+        <button id="pickup" type="button">拾起報紙</button>
+        <button id="swat" type="button">拍</button>
+        <button id="drop" type="button">放下</button>
+      </div>
+      <section class="screen" id="screen-end" hidden>
+        <h1 id="end-title">清咗</h1>
+        <p id="end-copy"></p>
+        <button class="primary" id="replay" type="button">再嚟一局</button>
+        <button id="remark" type="button">重新標方向</button>
+      </section>
+    </div>
+    <button id="light" type="button" hidden>光</button>
+    <div id="debug" hidden></div>
+  </div>
+  <script src="main.js" type="module"></script>
+</body>
+</html>
