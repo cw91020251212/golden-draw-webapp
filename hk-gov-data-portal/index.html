@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>香港政府數據途徑圖｜先知道有甚麼</title>
+  <meta name="description" content="盤點香港政府開放數據的主要途徑：目錄、API、座標、地址、空間物件、地圖與實時服務。第一步是知道有甚麼，未必即用。" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip" href="#pathways">跳至途徑一覽</a>
+
+  <header class="site-nav" role="banner">
+    <div class="nav-inner">
+      <a class="brand-mark" href="#top">港府數據途徑圖</a>
+      <nav aria-label="主要">
+        <a href="#pathways">途徑</a>
+        <a href="#coords">座標</a>
+        <a href="#apis">API</a>
+        <a href="#objects">物件位置</a>
+        <a href="#next">下一步</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- Hero: brand + one headline + one sentence + CTA + full-bleed visual -->
+    <section class="hero" aria-labelledby="hero-brand">
+      <div class="hero-bg" aria-hidden="true">
+        <svg class="hero-map" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="harbour" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#071422"/>
+              <stop offset="55%" stop-color="#123552"/>
+              <stop offset="100%" stop-color="#1f5a7a"/>
+            </linearGradient>
+            <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+              <path d="M48 0H0V48" fill="none" stroke="rgba(201,162,39,0.12)" stroke-width="1"/>
+            </pattern>
+          </defs>
+          <rect width="1200" height="700" fill="url(#harbour)"/>
+          <rect width="1200" height="700" fill="url(#grid)"/>
+          <!-- stylised harbour / island silhouette -->
+          <path class="skyline" d="M0 520 L80 510 L120 470 L160 490 L200 420 L240 450 L280 390 L320 430 L380 360 L420 400 L480 340 L520 380 L580 300 L640 350 L700 280 L760 330 L820 250 L880 310 L940 270 L1000 320 L1060 290 L1120 340 L1200 310 L1200 700 L0 700 Z" fill="rgba(8,20,36,0.55)"/>
+          <circle class="pulse-dot" cx="640" cy="300" r="6" fill="#e8b923"/>
+          <circle class="pulse-ring" cx="640" cy="300" r="6" fill="none" stroke="#e8b923" stroke-width="2"/>
+          <circle class="pulse-dot" cx="420" cy="400" r="4" fill="#f2d56b"/>
+          <circle class="pulse-dot" cx="820" cy="250" r="4" fill="#f2d56b"/>
+          <path class="route" d="M280 390 C400 320, 520 360, 640 300 S820 220, 940 270" fill="none" stroke="rgba(232,185,35,0.45)" stroke-width="2" stroke-dasharray="6 10"/>
+        </svg>
+      </div>
+      <div class="hero-content">
+        <p class="eyebrow">HK Government Data Pathways</p>
+        <h1 id="hero-brand">港府數據途徑圖</h1>
+        <p class="lede">先知道有甚麼途徑——目錄、API、座標、地址、空間物件與服務——再決定點用。</p>
+        <div class="hero-cta">
+          <a class="btn primary" href="#pathways">睇齊所有途徑</a>
+          <a class="btn ghost" href="#purpose">點解要呢一步</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="purpose" class="purpose band">
+      <div class="wrap narrow">
+        <h2>目的</h2>
+        <p>呢個頁唔係即用工具，而係<strong>發現地圖</strong>：幫你同團隊喺開工前睇清香港政府公開數據嘅入口、格式同責任部門。知道有甚麼，先至知道下一步問邊個、接邊個 API。</p>
+        <ol class="stages">
+          <li class="active"><span>1</span>知道有甚麼</li>
+          <li><span>2</span>揀途徑同權限</li>
+          <li><span>3</span>試接／下載</li>
+          <li><span>4</span>落地應用</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="pathways" class="pathways band">
+      <div class="wrap">
+        <header class="section-head">
+          <h2>七大途徑</h2>
+          <p>同一份資料可能同時以檔案、API、地圖服務幾種方式出現——先認途徑，再對應用途。</p>
+        </header>
+
+        <div class="pathway-grid" role="list">
+          <article class="pathway" role="listitem" data-filter="catalog">
+            <p class="tag">目錄</p>
+            <h3>開放數據目錄</h3>
+            <p>DATA.GOV.HK 集中發佈各局／署數據集：主題分類、下載連結、更新頻率、資料字典。</p>
+            <p class="entry">入口：<a href="https://data.gov.hk/tc/" target="_blank" rel="noopener">data.gov.hk</a></p>
+          </article>
+          <article class="pathway" role="listitem" data-filter="api">
+            <p class="tag">API</p>
+            <h3>程式介面</h3>
+            <p>CKAN 元數據 API、歷史檔案 API、各署專用 REST／JSON／RSS——適合系統對系統讀取。</p>
+            <p class="entry">入口：<a href="https://data.gov.hk/tc/help/api-spec" target="_blank" rel="noopener">API 說明</a></p>
+          </article>
+          <article class="pathway" role="listitem" data-filter="coords">
+            <p class="tag">座標</p>
+            <h3>座標系統與轉換</h3>
+            <p>WGS84、HK1980 地理／格網、UTM；地政總署提供即時座標轉換 API。</p>
+            <p class="entry">入口：<a href="https://www.geodetic.gov.hk/en/gi/transformation.htm" target="_blank" rel="noopener">大地測量轉換</a></p>
+          </article>
+          <article class="pathway" role="listitem" data-filter="address">
+            <p class="tag">地址</p>
+            <h3>地址／GeoAddress</h3>
+            <p>以自由文字或 19 字元 GeoAddress 查標準地址、樓宇單位同座標，統一跨系統位置識別。</p>
+            <p class="entry">入口：<a href="https://www.als.gov.hk/" target="_blank" rel="noopener">als.gov.hk</a></p>
+          </article>
+          <article class="pathway" role="listitem" data-filter="spatial">
+            <p class="tag">空間</p>
+            <h3>共用空間數據基建</h3>
+            <p>CSDI Portal：地圖 API、資料集 API（WFS／WMS／ArcGIS）、目錄服務、位置搜尋。</p>
+            <p class="entry">入口：<a href="https://portal.csdi.gov.hk/?lang=zh-hk" target="_blank" rel="noopener">portal.csdi.gov.hk</a></p>
+          </article>
+          <article class="pathway" role="listitem" data-filter="objects">
+            <p class="tag">物件</p>
+            <h3>設施／物件位置</h3>
+            <p>政府設施、道路、物業、監測站等空間圖層；可用位置搜尋或下載向量／地圖服務。</p>
+            <p class="entry">入口：<a href="https://www.map.gov.hk/" target="_blank" rel="noopener">map.gov.hk</a></p>
+          </article>
+          <article class="pathway" role="listitem" data-filter="services">
+            <p class="tag">服務</p>
+            <h3>實時與主題服務</h3>
+            <p>天文台天氣、運輸署交通、環境監測等持續更新端點——多數掛喺 DATA.GOV.HK 或部門網站。</p>
+            <p class="entry">入口：各主題數據集頁</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="matrix" class="matrix band alt">
+      <div class="wrap">
+        <header class="section-head">
+          <h2>用途 × 途徑對照</h2>
+          <p>唔知從邊度開始？用你想做到嘅事對返途徑。</p>
+        </header>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>你想……</th>
+                <th>優先途徑</th>
+                <th>典型產出</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>知政府公開咗咩數據</td>
+                <td>DATA.GOV.HK 目錄／CKAN <code>package_list</code></td>
+                <td>數據集清單、資源 URL</td>
+              </tr>
+              <tr>
+                <td>將 GPS 轉成香港格網</td>
+                <td>座標轉換 API</td>
+                <td>HK1980 Northing／Easting</td>
+              </tr>
+              <tr>
+                <td>用地址搵座標／標準寫法</td>
+                <td>Address Lookup／Location Search</td>
+                <td>地址記錄、GeoAddress、座標</td>
+              </tr>
+              <tr>
+                <td>喺地圖顯示設施圖層</td>
+                <td>CSDI WMS／Map API</td>
+                <td>地圖影像／底圖</td>
+              </tr>
+              <tr>
+                <td>下載向量做分析</td>
+                <td>CSDI WFS／FGDB／GeoJSON 下載</td>
+                <td>幾何 + 屬性</td>
+              </tr>
+              <tr>
+                <td>接實時天氣／交通</td>
+                <td>部門 Open API（經 DATA.GOV.HK）</td>
+                <td>JSON／XML／RSS</td>
+              </tr>
+              <tr>
+                <td>攞舊版本檔案</td>
+                <td>歷史檔案 API</td>
+                <td>按日期列出／下載</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="catalog" class="detail band">
+      <div class="wrap">
+        <header class="section-head">
+          <h2>1. 數據目錄與檔案</h2>
+          <p>最闊嘅入口：先搜主題，再睇資源格式同授權。</p>
+        </header>
+        <div class="detail-blocks">
+          <div>
+            <h3>DATA.GOV.HK</h3>
+            <ul>
+              <li>主題分類：運輸、天氣、地理土地、房屋、環境、醫療……</li>
+              <li>常見格式：CSV、JSON、XML、GeoJSON、KML、FGDB、PDF 字典</li>
+              <li>每項資源通常標示：提供部門、更新頻率、API 有無、資料字典連結</li>
+              <li>語言路徑：<code>/tc/</code> 繁中、<code>/en/</code> 英文、<code>/sc/</code> 簡中</li>
+            </ul>
+            <p class="links">
+              <a href="https://data.gov.hk/tc/" target="_blank" rel="noopener">開放數據入口</a>
+              <a href="https://data.gov.hk/tc/help/history" target="_blank" rel="noopener">歷史數據說明</a>
+            </p>
+          </div>
+          <div>
+            <h3>要記住</h3>
+            <ul>
+              <li>目錄頁嘅「API」可能係元數據 API，唔等於數據本身有 REST。</li>
+              <li>同一數據集可有多個資源（中／英、即時／歷史、唔同格式）。</li>
+              <li>使用前睇提供部門條款同資料字典；精準測量／法律用途可能唔適用。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="apis" class="detail band alt">
+      <div class="wrap">
+        <header class="section-head">
+          <h2>2. API 途徑</h2>
+          <p>分「搵數據」同「讀數據」兩層——唔好混淆。</p>
+        </header>
+        <div class="api-list">
+          <article>
+            <h3>CKAN 元數據 API</h3>
+            <p>列出同查詢 DATA.GOV.HK 上數據集嘅 metadata（名稱、資源 URL、描述）。</p>
+            <pre><code>GET https://data.gov.hk/tc-data/api/3/action/package_list
+GET https://data.gov.hk/tc-data/api/3/action/package_show?id=&lt;dataset_id&gt;
+GET …/group_list　…/group_show</code></pre>
+            <p class="note">只支援指定 GET；詳見 <a href="https://data.gov.hk/tc/help/ckan-api-development-guide" target="_blank" rel="noopener">CKAN API 指引</a>。</p>
+          </article>
+          <article>
+            <h3>歷史檔案 API</h3>
+            <p>按日期、類別、提供者以程式列出／下載舊檔。</p>
+            <pre><code>GET https://app.data.gov.hk/v1/historical-archive/list-files
+    ?start=YYYYMMDD&amp;end=YYYYMMDD&amp;…</code></pre>
+            <p class="note"><a href="https://data.gov.hk/tc/help/api-spec" target="_blank" rel="noopener">API Specification</a></p>
+          </article>
+          <article>
+            <h3>部門／主題 Open API</h3>
+            <p>掛喺個別數據集下，例如天文台天氣報告、交通快拍等；格式同限流以該署文件為準。</p>
+            <ul>
+              <li>天文台：天氣 Open Data API 文件（PDF）</li>
+              <li>運輸署：交通數據集（影像、流量、快拍位置等）</li>
+              <li>其他：環境、屋宇、規劃……以目錄搜尋「API」篩選</li>
+            </ul>
+          </article>
+          <article>
+            <h3>CSDI 地理空間服務</h3>
+            <ul>
+              <li><strong>OGC WFS</strong> — 向量查詢／下載</li>
+              <li><strong>OGC WMS</strong> — 地圖影像</li>
+              <li><strong>ArcGIS REST</strong> — ESRI 結構服務</li>
+              <li><strong>OGC Catalogue</strong> — 目錄發現</li>
+              <li><strong>Map APIs</strong> — 底圖／應用嵌入</li>
+            </ul>
+            <p class="note"><a href="https://portal.csdi.gov.hk/csdi-webpage/doc/GeoSpatialServices/" target="_blank" rel="noopener">GeoSpatial Services 說明</a></p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="coords" class="detail band">
+      <div class="wrap">
+        <header class="section-head">
+          <h2>3. 座標途徑</h2>
+          <p>香港項目成日要喺 WGS84 同 HK1980 之間轉換——呢個係獨立途徑，唔係「又一個數據集」。</p>
+        </header>
+        <div class="detail-blocks">
+          <div>
+            <h3>常用系統</h3>
+            <ul>
+              <li><strong>WGS84 地理</strong>（緯度／經度）— GPS、多數網圖預設</li>
+              <li><strong>HK1980 地理</strong> — 本地大地基準</li>
+              <li><strong>HK1980 格網</strong>（Northing／Easting，米）— 工程、地籍常用</li>
+              <li><strong>UTM</strong> Grid／Grid Reference — 區域投影</li>
+            </ul>
+            <h3>轉換 API（地政總署）</h3>
+            <pre><code>GET http://www.geodetic.gov.hk/transform/v2/
+    ?inSys=wgsgeog&amp;lat=22.3&amp;long=114.15</code></pre>
+            <p>參數：<code>inSys</code> / <code>outSys</code>（wgsgeog、hkgeog、hkgrid、utmgrid、utmref）、<code>lat</code>、<code>long</code>、<code>n</code>、<code>e</code>、<code>h</code>、<code>zone</code> 等。</p>
+            <p class="links">
+              <a href="https://data.gov.hk/tc-data/dataset/hk-landsd-openmap-coordinates-transformation-api" target="_blank" rel="noopener">數據集頁</a>
+              <a href="https://www.geodetic.gov.hk/transform/doc/DataDictionary.pdf" target="_blank" rel="noopener">Data Dictionary</a>
+            </p>
+          </div>
+          <div>
+            <h3>使用界線</h3>
+            <ul>
+              <li>只適用香港範圍內座標。</li>
+              <li>官方提醒：唔應用於要求精密定位嘅用途；基準轉換唔會提高精度。</li>
+              <li>法律／工程測量應諮詢註冊土地測量師。</li>
+              <li>CSDI 圖層常見 EPSG:4326 或 EPSG:2326（HK1980 Grid）。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="address" class="detail band alt">
+      <div class="wrap">
+        <header class="section-head">
+          <h2>4. 地址與位置識別</h2>
+          <p>文字地址亂、別名多——用標準服務對齊「同一個地方」。</p>
+        </header>
+        <div class="api-list">
+          <article>
+            <h3>Address Lookup Service（ALS）</h3>
+            <p>自由文字搜樓名、街道門牌、屋苑座數；可回傳中英地址同相關欄位。</p>
+            <pre><code>GET https://www.als.gov.hk/lookup?q=&lt;地址關鍵字&gt;</code></pre>
+            <p>常用參數：<code>n</code>（最多筆數）、<code>t</code>（分數容差）、<code>b</code>（基本搜尋）、<code>3d</code>（樓層／單位）。</p>
+          </article>
+          <article>
+            <h3>GeoAddress Lookup</h3>
+            <p>19 字元 GeoAddress 係跨系統共用參考（同一地點可有多種文字寫法）。</p>
+            <pre><code>GET https://www.als.gov.hk/galookup?ga=&lt;19字元GeoAddress&gt;</code></pre>
+            <p class="note"><a href="https://data.gov.hk/tc-data/dataset/hk-dpo-als_01-als" target="_blank" rel="noopener">ALS 數據集</a> · 數碼辦提供</p>
+          </article>
+          <article>
+            <h3>Location Search API（地圖）</h3>
+            <p>按地址、樓宇、地名、設施名搜位置——偏地圖應用。</p>
+            <pre><code>GET https://www.map.gov.hk/gs/api/v1.0.0/locationSearch?q=&lt;關鍵字&gt;</code></pre>
+            <p class="note">注意限流；版本號可能更新。<a href="https://portal.csdi.gov.hk/csdi-webpage/apidoc/LocationSearchAPI" target="_blank" rel="noopener">API 文件</a></p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="objects" class="detail band">
+      <div class="wrap">
+        <header class="section-head">
+          <h2>5. 物件位置與空間圖層</h2>
+          <p>「物件」＝設施、道路中心線、監測站、地段……有幾何嘅資料。</p>
+        </header>
+        <div class="detail-blocks">
+          <div>
+            <h3>點樣攞到物件</h3>
+            <ol>
+              <li>喺 CSDI／DATA.GOV.HK 搜主題（例如交通流量站、政府場地）。</li>
+              <li>睇資源：FGDB／KML／GML／GeoJSON 下載，或 GeoSpatial Service 連結。</li>
+              <li>用 WFS 按範圍／屬性過濾；用 WMS 只係睇圖。</li>
+              <li>需要「呢個名喺邊」→ Location Search／ALS，再對圖層。</li>
+            </ol>
+          </div>
+          <div>
+            <h3>相關入口</h3>
+            <ul>
+              <li><a href="https://portal.csdi.gov.hk/?lang=zh-hk" target="_blank" rel="noopener">CSDI Portal</a> — 空間數據目錄同 API</li>
+              <li><a href="https://www.map.gov.hk/" target="_blank" rel="noopener">地理資訊地圖</a> — 公眾地圖同開發 API</li>
+              <li>運輸署 Traffic Flow Census 等 — 站線、道路中心線等空間檔</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="services" class="detail band alt">
+      <div class="wrap">
+        <header class="section-head">
+          <h2>6. 服務與營運數據</h2>
+          <p>持續更新、偏向營運／公眾資訊嘅端點。</p>
+        </header>
+        <ul class="service-grid">
+          <li>
+            <h3>天氣與氣候</h3>
+            <p>香港天文台現行天氣、警告、數值等 Open Data。</p>
+            <a href="https://data.gov.hk/tc-data/dataset/hk-hko-rss-current-weather-report" target="_blank" rel="noopener">現行天氣報告</a>
+          </li>
+          <li>
+            <h3>運輸</h3>
+            <p>交通快拍、流量統計、相關空間位置。</p>
+            <a href="https://data.gov.hk/tc-data/dataset/?q=transport&amp;organization=td" target="_blank" rel="noopener">運輸署相關數據</a>
+          </li>
+          <li>
+            <h3>房屋／地址基建</h3>
+            <p>ALS 同相關住房地理資料。</p>
+            <a href="https://www.als.gov.hk/" target="_blank" rel="noopener">地址查詢服務</a>
+          </li>
+          <li>
+            <h3>土地發展</h3>
+            <p>地政、規劃、地圖 API 同轉換服務。</p>
+            <a href="https://data.gov.hk/tc-data/dataset/?tags=geography-and-land-information" target="_blank" rel="noopener">地理土地類</a>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="providers" class="detail band">
+      <div class="wrap">
+        <header class="section-head">
+          <h2>主要提供方（記名）</h2>
+          <p>問問題／報障時，對返負責部門會快好多。</p>
+        </header>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th>提供方</th><th>常見途徑</th><th>例子</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>數碼辦／DATA.GOV.HK 團隊</td><td>目錄、CKAN、歷史 API、ALS</td><td>平台政策、地址服務</td></tr>
+              <tr><td>地政總署</td><td>座標轉換、Map／Location API、空間圖層</td><td>HK1980、GeoInfo Map</td></tr>
+              <tr><td>CSDI</td><td>WFS／WMS／ArcGIS、Catalogue、Map APIs</td><td>跨署空間數據</td></tr>
+              <tr><td>天文台</td><td>天氣 Open API／RSS</td><td>現行天氣</td></tr>
+              <tr><td>運輸署</td><td>檔案下載、影像、空間統計</td><td>Traffic Flow Census</td></tr>
+              <tr><td>其他局／署</td><td>經 DATA.GOV.HK 發佈</td><td>按其數據集頁</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="next" class="next band">
+      <div class="wrap narrow">
+        <header class="section-head">
+          <h2>下一步清單</h2>
+          <p>第一步「知道」之後，建議按呢個次序推進——仍然可以未即用。</p>
+        </header>
+        <ol class="checklist">
+          <li>
+            <strong>圈定業務問題</strong>
+            <span>例如：顯示診所位置、對齊市民地址、轉工程座標。</span>
+          </li>
+          <li>
+            <strong>喺目錄搜 3–5 個候選數據集</strong>
+            <span>記低 dataset id、提供部門、更新頻率、有無字典。</span>
+          </li>
+          <li>
+            <strong>標註你需要邊種途徑</strong>
+            <span>只下載／要 API／要地圖服務／要座標轉換——可以多過一種。</span>
+          </li>
+          <li>
+            <strong>核對座標同識別鍵</strong>
+            <span>WGS84 定 HK1980？有無 GeoAddress？物件 ID 可唔可以跨系統？</span>
+          </li>
+          <li>
+            <strong>試一個最小讀取</strong>
+            <span>手動下載一個檔，或打一次 <code>package_show</code>／一個查詢 API。</span>
+          </li>
+          <li>
+            <strong>先寫「途徑說明」再寫程式</strong>
+            <span>邊個入口、邊個負責人、限制同授權——方便審批同交接。</span>
+          </li>
+        </ol>
+        <p class="closing">呢頁係地圖，唔係引擎。收齊途徑之後，先至值得談接駁同產品化。</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <p><strong>港府數據途徑圖</strong> — 非官方彙編，連結指向政府公開網站；內容可能隨政策更新，請以官方頁為準。</p>
+      <p class="fine">用途：發現與規劃 · 唔保證即時可用性 · 精準測量請循專業渠道</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
